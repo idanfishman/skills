@@ -1,0 +1,11 @@
+{
+  "name": "idanfishman",
+  "version": "1.0.0",
+  "description": "Personal skills",
+  "author": {
+    "name": "Idan Fishman",
+    "url": "https://github.com/idanfishman"
+  },
+  "repository": "https://github.com/idanfishman/skills",
+  "license": "MIT"
+}

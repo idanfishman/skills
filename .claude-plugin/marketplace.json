@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "idanfishman",
+  "description": "Idan Fishman's agent skills",
+  "owner": {
+    "name": "Idan Fishman",
+    "url": "https://github.com/idanfishman"
+  },
+  "plugins": [
+    {
+      "name": "idanfishman",
+      "source": "./",
+      "description": "Personal skills"
+    }
+  ]
+}
