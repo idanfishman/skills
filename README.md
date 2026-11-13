@@ -6,10 +6,10 @@ My agent setup. Each skill is a folder under [`skills/`](skills/) with a `SKILL.
 
 ```sh
 claude plugin marketplace add idanfishman/skills
-claude plugin install idanfishman@idanfishman
+claude plugin install fishman@fishman
 ```
 
-Run a skill as `/idanfishman:<skill>`. To get updates, run `claude plugin marketplace update idanfishman`.
+Run a skill as `/fishman:<skill>`. To get updates, run `claude plugin marketplace update fishman`.
 
 ## Develop
 
