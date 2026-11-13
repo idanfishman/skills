@@ -1,0 +1,31 @@
+# Run with prek (`mise exec -- prek run --all-files`), installed from mise.toml.
+#
+# Every hook is `repo: local` + `language: system` on purpose: the binaries come
+# from mise.toml, so tool versions live in exactly one file. Pinning `rev:` on
+# upstream hook repos would duplicate every version we already pin there.
+#
+# These hooks are fast feedback, not the gate. CI re-runs all of it, and zizmor's
+# online audits only work there.
+repos:
+  - repo: local
+    hooks:
+      - id: actionlint
+        name: actionlint
+        entry: actionlint
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+        pass_filenames: false
+
+      - id: zizmor
+        name: zizmor
+        entry: zizmor .
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+        pass_filenames: false
+
+      - id: claude-plugin-validate
+        name: claude plugin validate
+        entry: scripts/validate.sh
+        language: system
+        files: ^(\.claude-plugin/.*|skills/.*)$
+        pass_filenames: false

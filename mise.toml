@@ -1,0 +1,10 @@
+[tools]
+# Unpinned on purpose: claude-code ships several releases a day, and this repo only
+# runs `plugin validate` with it. A pin here also shadows a developer's own claude on
+# PATH whenever they are inside this checkout, and goes stale until someone runs
+# `mise up`. Resolving latest at install time keeps both current.
+"aqua:anthropics/claude-code" = "latest"
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
+zizmor = "1.30.0"
+prek = "0.5.2"
