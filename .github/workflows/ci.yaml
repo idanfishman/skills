@@ -1,7 +1,8 @@
 # The PR gate and the release, in one workflow. Four jobs:
 #   workflows — actionlint and zizmor on this repository's workflows.
 #   validate  — the marketplace, the plugin and its skills, via scripts/validate.sh.
-#   release   — releases v<version> from plugin.json when it has no release yet; main only.
+#   release   — releases v<version> from plugin.json with its CHANGELOG.md section as the notes,
+#               when it has no release yet; main only.
 #   ci-pass   — the single required status; a cancel reports nothing.
 
 name: CI
@@ -74,12 +75,15 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="v$(jq -er .version .claude-plugin/plugin.json)"
+          version="$(jq -er .version .claude-plugin/plugin.json)"
+          tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "$tag already released"
             exit 0
           fi
-          gh release create "$tag" --title "$tag" --target "$GITHUB_SHA" --generate-notes
+          # An assignment, so a failing script stops the job instead of releasing empty notes.
+          notes="$(scripts/release-notes.sh "$version")"
+          gh release create "$tag" --title "$tag" --target "$GITHUB_SHA" --notes "$notes"
 
   ci-pass:
     name: CI pass
