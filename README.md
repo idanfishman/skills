@@ -24,4 +24,4 @@ Run a skill as `/idanfishman:<skill>`. To get updates, run `claude plugin market
 
 ## License
 
-[MIT](LICENSE)
+[Unlicense](LICENSE): public domain.
