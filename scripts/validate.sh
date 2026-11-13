@@ -6,3 +6,7 @@ cd "$(dirname "$0")/.."
 
 # The plugin is the repo root, so this one call also checks plugin.json and skills/.
 claude plugin validate . --strict
+
+# The release job publishes this section after merge, so a bump without it fails here, not there.
+version="$(jq -er .version .claude-plugin/plugin.json)"
+scripts/release-notes.sh "$version" >/dev/null
