@@ -1,7 +1,6 @@
 ---
 name: push
-description: Open a PR for verified work, have it checked independently on the PR, fix what's found, and merge it once CI passes, unless it is critical.
-disable-model-invocation: true
+description: Open a PR for verified work, have it checked independently on the PR, fix what's found, and merge it once CI passes, unless it is critical. Use when the user asks to push or ship the work.
 ---
 
 Push the current work as a pull request. The steps below add an independent check, recorded on the PR.
