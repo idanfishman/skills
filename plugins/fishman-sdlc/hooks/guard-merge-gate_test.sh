@@ -20,8 +20,9 @@ mcp() { jq -nc --arg t "$1" --argjson i "$2" '{tool_name: $t, tool_input: $i}'; 
 
 # Stands in for gh api. In idanfishman/example, pull request 13 carries the critical label and 14 can't be
 # read. On their heads, 15 has a failing check run, 16 a running one, 17 unreadable checks, 18 no checks,
-# 19 a failing commit status and 20 more check runs than one page. Branch "feature" is pull request 12 and
-# "hotfix" is 13; the current branch is 12. idanfishman/nolabel has no critical label.
+# 19 a failing commit status and 20 more check runs than one page. 21 carries the label as "Critical". An
+# issue has the labels of the pull request with its number. Branch "feature" is pull request 12 and "hotfix"
+# is 13; the current branch is 12. idanfishman/nolabel has no critical label.
 GUARD_GH=$(mktemp)
 bodies=$(mktemp -d)
 trap 'rm -rf "$GUARD_GH" "$bodies"' EXIT
@@ -37,6 +38,9 @@ case $2 in
   repos/*/pulls\?head=*) echo '[]' ;;
   repos/*/pulls/14) exit 1 ;;
   repos/*/pulls/13) echo '{"labels": [{"name": "critical"}], "head": {"sha": "s13"}}' ;;
+  repos/*/pulls/21) echo '{"labels": [{"name": "Critical"}], "head": {"sha": "s21"}}' ;;
+  repos/*/issues/13) echo '{"labels": [{"name": "critical"}, {"name": "docs"}]}' ;;
+  repos/*/issues/*) echo '{"labels": [{"name": "docs"}]}' ;;
   repos/*/pulls/*) echo "{\"labels\": [{\"name\": \"docs\"}], \"head\": {\"sha\": \"s${2##*/}\"}}" ;;
   repos/idanfishman/nolabel/labels/critical) exit 1 ;;
   repos/*/labels/critical) echo '{"name": "critical"}' ;;
@@ -87,6 +91,17 @@ check 2 "$(bash_cmd 'FOO=1 gh pr merge 13 --squash')"
 check 2 "$(bash_cmd 'GH_REPO=idanfishman/nolabel gh pr merge 12 --squash')"
 check 2 "$(bash_cmd 'env GH_REPO=idanfishman/nolabel gh pr merge 12 --squash')"
 check 2 "$(bash_cmd 'cd /tmp && command gh pr merge 13 --squash')"
+check 2 "$(bash_cmd 'gh pr merge 15 --squash --auto')"
+check 2 "$(bash_cmd 'gh pr merge 16 --squash --auto')"
+check 2 "$(bash_cmd 'gh pr merge 21 --squash')"
+check 2 "$(bash_cmd 'gh pr merge 12 --squash --admin=true')"
+check 2 "$(bash_cmd 'gh pr merge 12 --squash -Ridanfishman/nolabel')"
+# shellcheck disable=SC2016 # The command substitution is the case under test.
+check 2 "$(bash_cmd 'echo $(gh pr merge 13 --squash)')"
+# shellcheck disable=SC2016 # So is the backtick form.
+check 2 "$(bash_cmd 'echo `gh pr merge 13 --squash`')"
+check 2 "$(bash_cmd 'cd ../other && gh pr merge 12 --squash')"
+check 2 "$(bash_cmd 'pushd ../other && gh pr merge --squash')"
 # gh pr review
 check 2 "$(bash_cmd 'gh pr review 12 --approve')"
 check 2 "$(bash_cmd 'gh pr review 12 -a -b lgtm')"
@@ -112,12 +127,22 @@ check 2 "$(bash_cmd "gh api repos/idanfishman/example/pulls/12/reviews/7/events 
 check 2 "$(bash_cmd $'gh api repos/idanfishman/example/pulls/12/reviews --input - <<\'EOF\'\n{"event": "APPROVE"}\nEOF')"
 check 2 "$(bash_in "$bodies" 'gh api repos/idanfishman/example/pulls/12/reviews --input approve.json')"
 check 2 "$(bash_cmd 'gh api -X DELETE repos/idanfishman/example/issues/13/labels/critical')"
+check 2 "$(bash_cmd 'gh api -X DELETE repos/idanfishman/example/issues/13/labels/Critical')"
+check 2 "$(bash_cmd 'gh api -X PUT repos/idanfishman/example/issues/13/labels -f "labels[]=docs"')"
+check 2 "$(bash_cmd 'gh api -X DELETE repos/idanfishman/example/issues/13/labels')"
+check 2 "$(bash_cmd 'gh api -X PATCH repos/idanfishman/example/issues/13 -f "labels[]=docs"')"
+check 2 "$(bash_cmd 'gh api -X PUT repos/idanfishman/example/pulls/15/ccr/auto_merge')"
+check 2 "$(bash_cmd 'cd ../other && gh api -X PUT "repos/{owner}/{repo}/pulls/12/merge"')"
+check 2 "$(bash_cmd "gh api repos/idanfishman/example/rulesets --input $bodies/query.json")"
+check 2 "$(bash_cmd 'gh api graphql -f query="mutation { addPullRequestReview(input: {pullRequestId: \"x\", event: APPROVE}) { clientMutationId } }"')"
 # The critical label
 check 2 "$(bash_cmd 'gh pr edit 13 --remove-label critical')"
 check 2 "$(bash_cmd 'gh pr edit 13 --remove-label "docs, critical"')"
 check 2 "$(bash_cmd 'gh issue edit 13 --remove-label=critical')"
 check 2 "$(bash_cmd 'gh label delete critical --yes')"
 check 2 "$(bash_cmd 'gh label edit critical --name later')"
+check 2 "$(bash_cmd 'gh pr edit 13 --remove-label Critical')"
+check 2 "$(bash_cmd 'gh label delete Critical --yes')"
 # GitHub MCP tools
 check 2 "$(mcp mcp__github__merge_pull_request '{"owner": "idanfishman", "repo": "example", "pullNumber": 13}')"
 check 2 "$(mcp mcp__github__merge_pull_request '{"owner": "idanfishman", "repo": "example", "pullNumber": 15}')"
@@ -125,6 +150,13 @@ check 2 "$(mcp mcp__github__merge_pull_request '{"pullNumber": 12}')"
 check 2 "$(mcp mcp__github__enable_pr_auto_merge '{"owner": "idanfishman", "repo": "example", "pullNumber": 13}')"
 check 2 "$(mcp mcp__github__enable_pr_auto_merge '{"owner": "idanfishman", "repo": "nolabel", "pullNumber": 12}')"
 check 2 "$(mcp mcp__plugin_engineering_github__pull_request_review_write '{"method": "create", "event": "APPROVE"}')"
+check 2 "$(mcp mcp__github__pull_request_review_write '{"method": "create", "event": "approve"}')"
+check 2 "$(mcp mcp__github__merge_pull_request '{"owner": "idanfishman", "repo": "example", "pullNumber": 21}')"
+check 2 "$(mcp mcp__github__enable_pr_auto_merge '{"owner": "idanfishman", "repo": "example", "pullNumber": 15}')"
+check 2 "$(mcp mcp__github__issue_write '{"method": "update", "owner": "idanfishman", "repo": "example", "issue_number": 13, "labels": ["docs"]}')"
+check 2 "$(mcp mcp__github__issue_write '{"method": "update", "owner": "idanfishman", "repo": "example", "issue_number": 13, "labels": []}')"
+check 2 "$(mcp mcp__github__remove_issue_label '{"owner": "idanfishman", "repo": "example", "issue_number": 13, "label": "critical"}')"
+check 2 "$(mcp mcp__github__label_write '{"method": "delete", "owner": "idanfishman", "repo": "example", "name": "Critical"}')"
 
 check 0 "$(bash_cmd 'gh pr merge 12 --squash')"
 check 0 "$(bash_cmd 'git push && gh pr merge 12 --squash --delete-branch')"
@@ -156,12 +188,26 @@ check 0 "$(bash_in "$bodies" 'gh api repos/idanfishman/example/pulls/12/reviews 
 check 0 "$(bash_cmd 'gh pr edit 13 --add-label critical')"
 check 0 "$(bash_cmd 'gh pr edit 13 --remove-label docs,critical-path')"
 check 0 "$(bash_cmd 'gh label edit critical --description "Needs the owner"')"
+check 0 "$(bash_cmd 'cd ../other && gh pr merge https://github.com/idanfishman/example/pull/12 --squash')"
+check 0 "$(bash_cmd 'cd ../other && gh pr merge 12 --squash --repo idanfishman/example')"
+check 0 "$(bash_cmd 'gh api -X PUT repos/idanfishman/example/issues/13/labels -f "labels[]=critical" -f "labels[]=docs"')"
+check 0 "$(bash_cmd 'gh api repos/idanfishman/example/issues/13/labels -f "labels[]=docs"')"
+check 0 "$(bash_cmd 'gh api -X PUT repos/idanfishman/example/issues/12/labels -f "labels[]=docs"')"
+check 0 "$(bash_cmd 'gh api -X PATCH repos/idanfishman/example/issues/13 -f title=Renamed')"
 check 0 "$(mcp mcp__github__merge_pull_request '{"owner": "idanfishman", "repo": "example", "pullNumber": 12}')"
 check 0 "$(mcp mcp__github__enable_pr_auto_merge '{"owner": "idanfishman", "repo": "example", "pullNumber": 12}')"
 check 0 "$(mcp mcp__github__disable_pr_auto_merge '{"owner": "idanfishman", "repo": "example", "pullNumber": 13}')"
 check 0 "$(mcp mcp__github__pull_request_read '{"method": "get_reviews", "pullNumber": 12}')"
 check 0 "$(mcp mcp__github__add_comment_to_pending_review '{"body": "I approve of this name"}')"
+check 0 "$(mcp mcp__github__issue_write '{"method": "update", "owner": "idanfishman", "repo": "example", "issue_number": 12, "labels": ["docs"]}')"
+check 0 "$(mcp mcp__github__issue_write '{"method": "update", "owner": "idanfishman", "repo": "example", "issue_number": 13, "labels": ["Critical", "docs"]}')"
+check 0 "$(mcp mcp__github__label_write '{"method": "create", "owner": "idanfishman", "repo": "example", "name": "critical"}')"
 check 0 "$(jq -nc '{tool_name: "Edit", tool_input: {file_path: "x"}}')"
+
+# Without jq on PATH, the hook still blocks.
+PATH=/nonexistent "$BASH" "$guard" <<<"$(bash_cmd 'gh pr merge 13 --squash')" >/dev/null 2>&1
+nojq=$?
+[ "$nojq" = 2 ] || { echo "FAIL want 2 got $nojq: the hook without jq on PATH"; fail=1; }
 
 [ "$fail" = 0 ] && echo "guard-merge-gate: all cases pass"
 exit "$fail"

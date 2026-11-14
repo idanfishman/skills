@@ -33,7 +33,7 @@ The short `/push` also works when no other command has that name. Claude Code ha
 
 2. In `CLAUDE.md`, name the gate: one command that runs every check and fails on error. "Done" includes its output.
 3. Add a `REVIEW.md`. It names the review passes in order, what counts as Important, the nit cap, and what not to report. Without one, the reviewer runs a bugs pass and a security pass.
-4. Create a `critical` label, and have CI add it to the paths that need your review, for example with [actions/labeler](https://github.com/actions/labeler). Without the label, Claude merges nothing.
+4. Create a `critical` label, and have CI add it to each PR that touches a path that needs your review, for example with [actions/labeler](https://github.com/actions/labeler). Without the label, Claude merges nothing.
 5. Optional: use [OpenSpec](https://github.com/Fission-AI/OpenSpec) for the intent of each change, with `openspec init --tools claude`. Without it, the PR body states the intent.
 
 ## The loop
@@ -50,8 +50,8 @@ Claude may merge a PR only when all of these are true:
 
 - The repository has a `critical` label.
 - The PR does not carry the `critical` label.
-- Every check on the PR's head passed. To arm auto-merge, the first two are enough, because GitHub waits for the checks.
+- The PR has at least one check, and every check on its head passed. This also holds for auto-merge, because GitHub waits only for required checks.
 
-The hook never lets Claude approve a PR, merge with `--admin`, remove or rename the `critical` label, or change branch protection or rulesets. It checks merges through `gh pr merge`, `gh api` and the GitHub MCP tools the same way, and it reads a request body that `gh api` takes from a file or stdin. It reads GitHub only through the REST API, so it also works in Claude Code cloud sessions, which block GitHub's GraphQL API.
+The hook never lets Claude approve a PR, merge with `--admin`, remove or rename the `critical` label, or change branch protection or rulesets. It checks merges through `gh pr merge`, `gh api` and the GitHub MCP tools the same way, and it reads a request body that `gh api` takes from a file or stdin. It reads GitHub only through the REST API, so it also works in Claude Code cloud sessions, which block GitHub's GraphQL API. The hook needs `jq`. When it can't run or can't read what it needs, it blocks.
 
 The hook matches the command line, so a script, `bash -c` or a browser can route around it. It stops a mistake, not an adversary. Where your GitHub plan allows it, add branch protection as the hard boundary.
