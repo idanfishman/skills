@@ -4,9 +4,24 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# The plugin is the repo root, so this one call also checks plugin.json and skills/.
+# The marketplace, then each plugin with its skills, agents and hooks.
 claude plugin validate . --strict
+for plugin in plugins/*/; do
+  claude plugin validate "$plugin" --strict
+done
+
+# Each hook has a test next to it. A test exits non-zero when a case fails.
+shellcheck scripts/*.sh plugins/*/hooks/*.sh
+for test in plugins/*/hooks/*_test.sh; do
+  bash "$test"
+done
+
+# The plugins release together, so they carry one version.
+versions="$(jq -r .version plugins/*/.claude-plugin/plugin.json | sort -u)"
+if [[ $(wc -l <<<"$versions") != 1 ]]; then
+  echo "The plugins carry different versions: $(tr '\n' ' ' <<<"$versions")" >&2
+  exit 1
+fi
 
 # The release job publishes this section after merge, so a bump without it fails here, not there.
-version="$(jq -er .version .claude-plugin/plugin.json)"
-scripts/release-notes.sh "$version" >/dev/null
+scripts/release-notes.sh "$versions" >/dev/null

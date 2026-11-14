@@ -1,7 +1,7 @@
 # The PR gate and the release, in one workflow. Four jobs:
 #   workflows — actionlint and zizmor on this repository's workflows.
-#   validate  — the marketplace, the plugin and its skills, via scripts/validate.sh.
-#   release   — releases v<version> from plugin.json with its CHANGELOG.md section as the notes,
+#   validate  — the marketplace, the plugins and their hook tests, via scripts/validate.sh.
+#   release   — releases v<version> from the plugins' shared version, with its CHANGELOG.md section as the notes,
 #               when it has no release yet; main only.
 #   ci-pass   — the single required status; a cancel reports nothing.
 
@@ -55,7 +55,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          install_args: aqua:anthropics/claude-code
+          install_args: aqua:anthropics/claude-code shellcheck
       - run: scripts/validate.sh
 
   release:
@@ -75,7 +75,7 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(jq -er .version .claude-plugin/plugin.json)"
+          version="$(jq -er .version plugins/fishman/.claude-plugin/plugin.json)"
           tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "$tag already released"

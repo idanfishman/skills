@@ -1,7 +1,7 @@
 {
-  "name": "fishman",
-  "version": "1.1.0",
-  "description": "Personal skills",
+  "name": "fishman-sdlc",
+  "version": "1.2.0",
+  "description": "An AI-native SDLC: ship a PR with an independent verifier and reviewer, behind a merge gate you hold",
   "author": {
     "name": "Idan Fishman",
     "url": "https://github.com/idanfishman"

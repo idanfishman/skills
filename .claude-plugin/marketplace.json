@@ -9,8 +9,13 @@
   "plugins": [
     {
       "name": "fishman",
-      "source": "./",
-      "description": "Personal skills"
+      "source": "./plugins/fishman",
+      "description": "Writing skills: plain language, and context that Claude reads"
+    },
+    {
+      "name": "fishman-sdlc",
+      "source": "./plugins/fishman-sdlc",
+      "description": "An AI-native SDLC: ship a PR with an independent verifier and reviewer, behind a merge gate you hold"
     }
   ]
 }
