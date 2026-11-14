@@ -1,0 +1,11 @@
+{
+  "name": "fishman-typescript",
+  "version": "1.1.0",
+  "description": "A TypeScript style guide: Google's guide, with house rulings for Biome and Ultracite",
+  "author": {
+    "name": "Idan Fishman",
+    "url": "https://github.com/idanfishman"
+  },
+  "repository": "https://github.com/idanfishman/skills",
+  "license": "Unlicense"
+}

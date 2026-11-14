@@ -27,5 +27,5 @@ repos:
         name: claude plugin validate
         entry: scripts/validate.sh
         language: system
-        files: ^(\.claude-plugin/.*|skills/.*|CHANGELOG\.md|\.github/release-footer\.md)$
+        files: ^(\.claude-plugin/.*|plugins/.*|scripts/.*|CHANGELOG\.md|\.github/release-footer\.md)$
         pass_filenames: false
