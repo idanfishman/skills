@@ -2,6 +2,8 @@
 
 My agent skills, shipped as the `fishman` Claude Code plugin. The repo root is the plugin. Each skill is a folder in `skills/` with a `SKILL.md` in the [Agent Skills](https://agentskills.io) format.
 
+`references/` holds summaries of source articles, as a base for new skills. They are not skills and do not ship in a release on their own.
+
 ## Commands
 
 - Setup, once per clone: `mise install`, then `mise exec -- prek install`.
