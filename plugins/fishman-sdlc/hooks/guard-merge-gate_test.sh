@@ -17,16 +17,46 @@ check() {
 run() { jq -nc --arg c "$1" '{tool_name: "Bash", tool_input: {command: $c}}'; }
 mcp() { jq -nc --arg t "mcp__github__$1" --argjson n "$2" '{tool_name: $t, tool_input: {owner: "o", repo: "r", pullNumber: $n}}'; }
 
-# A gh on PATH that stands in for the real one. Pull request 2 has the Critical label, and so does each
-# pull request in other/repo. gh can't read pull request 3. Each other pull request has a docs label.
+# A gh on PATH that stands in for the real one. It answers the three calls that the hook makes:
+#   gh pr view [TARGET] [--repo REPO]: the URL of pull request TARGET, or of pull request 1 without one.
+#   gh api repos/OWNER/REPO/pulls/N: the head commit sha-N, then the labels.
+#   gh api repos/OWNER/REPO/commits/sha-N/check-runs: one check conclusion per line.
+# Pull request 2 has the Critical label, and so does each pull request in other/repo. gh can't read
+# pull request 3. Pull request 4 has a failed check, 5 has a pending check, and 6 has no checks. gh
+# can't read the checks of 7. Each other pull request has a docs label, and its checks passed.
 stub=$(mktemp -d)
 trap 'rm -rf "$stub"' EXIT
 cat >"$stub/gh" <<'STUB'
 #!/usr/bin/env bash
-case " $* " in
-  *" 3 "* | */3" "*) echo "HTTP 404: Not Found" >&2 && exit 1 ;;
-  *" 2 "* | */2" "* | *" other/repo "*) echo Critical ;;
-  *) echo docs ;;
+if [ "$1" = pr ]; then
+  n=1 repo=o/r
+  shift 2
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --repo | -R) repo=$2 && shift ;;
+      --json | --jq) shift ;;
+      */pull/*) repo=$(cut -d/ -f4-5 <<<"$1") n=${1##*/} ;;
+      *) n=$1 ;;
+    esac
+    shift
+  done
+  echo "https://github.com/$repo/pull/$n"
+  exit 0
+fi
+case $2 in
+  */check-runs*)
+    n=${2#*/sha-} n=${n%%/*}
+    case $n in
+      4) printf 'success\nfailure\n' ;;
+      5) printf 'success\npending\n' ;;
+      6) ;;
+      7) echo "HTTP 500: Server Error" >&2 && exit 1 ;;
+      *) printf 'success\nskipped\n' ;;
+    esac
+    ;;
+  */pulls/3) echo "HTTP 404: Not Found" >&2 && exit 1 ;;
+  */pulls/2 | repos/other/repo/*) printf 'sha-%s\nCritical\n' "${2##*/}" ;;
+  *) printf 'sha-%s\ndocs\n' "${2##*/}" ;;
 esac
 STUB
 chmod +x "$stub/gh"
@@ -43,6 +73,12 @@ check 2 "$(run "git push && gh pr merge 2 --squash")"
 check 2 "$(run "if gh pr checks 2; then gh pr merge 2 --squash; fi")"
 check 0 "$(run 'git commit -m "Run gh pr merge 2 after CI"')"
 
+# A pull request that isn't ready.
+check 2 "$(run "gh pr merge 4 --squash")"
+check 2 "$(run "gh pr merge 5 --squash")"
+check 2 "$(run "gh pr merge 6 --auto")"
+check 2 "$(run "gh pr merge 7 --squash")"
+
 # gh api and the GitHub MCP tools.
 check 0 "$(run "gh api -X PUT repos/o/r/pulls/1/merge")"
 check 2 "$(run "gh api -X PUT repos/o/r/pulls/2/merge")"
@@ -50,6 +86,9 @@ check 2 "$(run "gh api -X PUT repos/o/r/pulls/2/ccr/auto_merge")"
 check 0 "$(mcp merge_pull_request 1)"
 check 2 "$(mcp merge_pull_request 2)"
 check 2 "$(mcp enable_pr_auto_merge 2)"
+check 2 "$(run "gh api -X PUT repos/o/r/pulls/4/merge")"
+check 2 "$(mcp merge_pull_request 5)"
+check 2 "$(mcp enable_pr_auto_merge 6)"
 
 # Other work, and a hook that can't run.
 check 0 "$(run "gh pr view 2")"
