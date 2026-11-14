@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-14
+
+### Added
+
+- The `fishman-typescript` plugin is a TypeScript style guide. The Google TypeScript Style Guide is the standard, and Ultracite on Biome enforces it. Turn it on per repository, as [its README](https://github.com/idanfishman/skills/tree/main/plugins/fishman-typescript) says.
+  - A hook loads the guide at session start, but only in a repository with a `tsconfig.json`.
+  - `STYLEGUIDE.md` lists every rule, with an id and the tool that holds it. The reviewer cites these ids and reports only the rules that no tool holds.
+  - `biome.jsonc` extends Ultracite and changes its settings where they differ from Google, such as single quotes. Copy it to your repository root.
+  - The guide departs from Google in four places. There is no `enum` and no parameter property, because Node strips types. File names are kebab-case, as the shadcn/ui CLI writes them. A default export is allowed only where a tool reads one. Where Biome bans what Google allows, such as `forEach` or `!`, the lint gate wins, and the escape is a `biome-ignore` comment with a reason.
+
 ## [1.2.0] - 2026-11-14
 
 ### Added
@@ -33,7 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The `no-fluff` skill writes or rewrites text to a clear-writing standard based on ASD-STE100 Simplified Technical English. Run it as `/fishman:no-fluff [text or file]`. Give it a file path to rewrite that file, or a description to write new text. Claude also loads it when you ask for plain, simple or clear language.
 - The `come-again` skill tells Claude to explain its last answer again in `no-fluff` style. Claude first gives 2–3 sentences of context, then the answer. Run it as `/fishman:come-again [part]` to explain only one part. Claude loads it only when you run the command.
 
-[unreleased]: https://github.com/idanfishman/skills/compare/v1.2.0...HEAD
+[unreleased]: https://github.com/idanfishman/skills/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/idanfishman/skills/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/idanfishman/skills/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/idanfishman/skills/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/idanfishman/skills/releases/tag/v1.0.0

@@ -21,7 +21,7 @@ The guide assumes that `tsconfig` sets `strict`, `erasableSyntaxOnly`, `exactOpt
    ```json
    {
      "extraKnownMarketplaces": {
-       "fishman": { "source": { "source": "github", "repo": "idanfishman/skills", "ref": "v1.2.0" } }
+       "fishman": { "source": { "source": "github", "repo": "idanfishman/skills", "ref": "v1.3.0" } }
      },
      "enabledPlugins": { "fishman-typescript@fishman": true }
    }
