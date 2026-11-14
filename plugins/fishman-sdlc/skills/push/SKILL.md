@@ -21,7 +21,7 @@ Push the current work as a pull request. The steps below add an independent chec
    - A review thread is yours only when it is unresolved and holds exactly one comment, which contains `<!-- fishman-sdlc:review -->`. Any reply makes it the owner's. Answer each of yours with one reply that ends in `<!-- fishman-sdlc:review -->`, and resolve it: fixed, naming the commit, or a nit left as is, saying why. An Important finding still open after two rounds stays unresolved, and so does every thread that isn't yours.
 7. When the last round is clean, archive the OpenSpec change, if there is one, as the PR's final commit: `openspec archive <change-id> --yes`, then `openspec validate --all --strict`. Push it. Then wait for CI with `gh pr checks --watch`. When every check passes, merge with `gh pr merge --squash --delete-branch`, and report the PR URL.
    - A PR labelled `critical` waits for the owner's review. The merge-gate hook refuses it, so report its URL and say it is critical.
-   - If the hook can't read the labels, it refuses too. Retry once, then report the hook's message.
+   - The hook also refuses while a check fails or is pending, or when it can't read the labels or the checks. Retry once, then report the hook's message.
 8. Never merge past a failing check, and never disable or bypass one.
 
 If a `gh pr` command fails because GitHub's GraphQL API is blocked, as in Claude Code cloud sessions, use its REST route through `gh api`.

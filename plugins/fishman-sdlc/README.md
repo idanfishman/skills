@@ -46,7 +46,7 @@ When to use each part:
 | `/fishman-sdlc:review` | Skill | Runs the reviewer and posts its findings as inline PR comments. It never approves. |
 | `reviewer` | Agent: Opus, high effort | Reviews the diff against the repository's `REVIEW.md` and the change's intent, from a fresh context. It reports and never edits. |
 | `verifier` | Agent: Sonnet, medium effort | Runs the gate and exercises each scenario of the change, as its actor. It reports and never fixes. |
-| Merge gate | `PreToolUse` hook | Stops Claude from merging a PR that has the `critical` label. |
+| Merge gate | `PreToolUse` hook | Stops Claude from merging a PR that has the `critical` label, or whose checks have not all passed. |
 
 The short `/push` also works when no other command has that name. Claude Code has a built-in `/review`, so use `/fishman-sdlc:review`.
 
@@ -76,8 +76,11 @@ The short `/push` also works when no other command has that name. Claude Code ha
 
 ## The merge gate
 
-The hook stops Claude from merging a PR that has the `critical` label. It checks `gh pr merge`, the merge and auto-merge routes of `gh api`, and the GitHub MCP merge tools. If it can't read the PR's labels, it blocks. It needs `jq`.
+The hook stops Claude from merging a PR in two cases:
 
-The hook checks only the label. `/fishman-sdlc:push` waits for every check to pass before it merges.
+- The PR has the `critical` label.
+- The PR is not ready. Ready means that every check on the PR's head commit finished as success, skipped or neutral. A PR with no checks is not ready.
+
+It checks `gh pr merge`, the merge and auto-merge routes of `gh api`, and the GitHub MCP merge tools. Auto-merge gets the same rule, because without required checks GitHub can merge at once. If the hook can't read the PR's labels or checks, it blocks. It needs `jq`.
 
 The hook stops a mistake, not an adversary. It reads the command line, so a deliberate bypass can route around it, such as a script or `bash -c`. Where your GitHub plan allows it, add branch protection as the hard boundary.
