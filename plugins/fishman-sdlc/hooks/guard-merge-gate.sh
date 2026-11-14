@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stops Claude standing in for the owner at the merge gate. Claude may merge a pull request only when the
 # repository has a `critical` label, the pull request doesn't carry it, and every check passed. The hook
-# also blocks approving a pull request, removing or renaming the `critical` label, and loosening branch
-# protection. Wired to PreToolUse by hooks.json; exit 2 blocks the call and hands stderr back to Claude.
+# also blocks approving a pull request, removing or renaming the `critical` label, and changing branch
+# protection or rulesets. Wired to PreToolUse by hooks.json; exit 2 blocks the call and hands stderr back to Claude.
 #
 # It reads GitHub through the REST API only, because cloud sessions block GraphQL. So every way to merge
 # gets the same check: gh pr merge, gh api, and the GitHub MCP tools.
@@ -25,7 +25,7 @@ tool=$(jq -r '.tool_name // ""' <<<"$input")
 cwd=$(jq -r '.cwd // "."' <<<"$input")
 
 deny() {
-  echo "Blocked: $1. Claude may merge only when the repository has a critical label, the pull request doesn't carry it, and every check passed, and the hook must read all three. A critical pull request is the owner's to review and merge, so hand over its URL. Approving is the owner's call too." >&2
+  echo "Blocked: $1. Claude merges only when the repository has a critical label, the pull request doesn't carry it, and every check passed. The hook must read all three. Merging a critical pull request and approving are the owner's calls, so hand over the URL." >&2
   exit 2
 }
 
@@ -80,8 +80,9 @@ fi
 cmd=$(jq -r '.tool_input.command // ""' <<<"$input")
 
 # One segment per gh invocation that starts a command, cut at the next ; & or |, so a chained command
-# is judged per part and a mere mention (git log --grep "gh pr merge") is not.
-segments() { grep -Eo "(^|[;&|(\`])[[:space:]]*gh[[:space:]]+$1[^;&|]*" <<<"$cmd" || true; }
+# is judged per part and a mere mention (git log --grep "gh pr merge") is not. A command also starts
+# after then, do, else, elif, { and !.
+segments() { grep -Eo "(^|[;&|(\`{!])[[:space:]]*((then|do|else|elif)[[:space:]]+)?gh[[:space:]]+$1[^;&|]*" <<<"$cmd" || true; }
 has() { grep -Eq -- "$2" <<<"$1"; }
 has_i() { grep -Eqi -- "$2" <<<"$1"; }
 # After a cd or pushd, gh resolves the current repository somewhere this hook can't see.

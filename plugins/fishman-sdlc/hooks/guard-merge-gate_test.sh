@@ -84,6 +84,13 @@ check 2 "$(bash_cmd 'echo $(gh pr merge 13 --squash)')"
 # shellcheck disable=SC2016 # So is the backtick form.
 check 2 "$(bash_cmd 'echo `gh pr merge 13 --squash`')"
 check 2 "$(bash_cmd 'cd ../other && gh pr merge 12 --squash')"
+check 2 "$(bash_cmd 'if gh pr checks 13; then gh pr merge 13 --squash; fi')"
+check 2 "$(bash_cmd 'for n in 1; do gh pr merge 13 --squash; done')"
+check 2 "$(bash_cmd '{ gh pr merge 13 --squash; }')"
+check 2 "$(bash_cmd '! gh pr merge 13 --squash')"
+check 2 "$(bash_cmd 'if true; then gh pr review 12 --approve; fi')"
+# A payload the hook can't parse fails closed.
+check 2 'not json'
 check 2 "$(bash_cmd 'pushd ../other && gh pr merge --squash')"
 # gh pr review
 check 2 "$(bash_cmd 'gh pr review 12 --approve')"
@@ -133,6 +140,7 @@ check 0 "$(bash_cmd 'gh pr merge 12 --squash --repo idanfishman/example')"
 check 0 "$(bash_cmd 'gh pr merge feature --squash')"
 check 0 "$(bash_cmd 'gh pr merge --squash')"
 check 0 "$(bash_cmd 'gh pr merge 12 --squash --auto')"
+check 0 "$(bash_cmd 'if gh pr checks 12; then gh pr merge 12 --squash; fi')"
 check 0 "$(bash_cmd 'gh pr merge --squash --auto')"
 check 0 "$(bash_cmd 'gh pr merge 13 --disable-auto')"
 check 0 "$(bash_cmd 'gh pr review 12 --comment -b "see line 4"')"

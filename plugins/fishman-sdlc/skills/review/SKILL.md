@@ -1,6 +1,6 @@
 ---
 name: review
-description: Review a pull request against the repository's REVIEW.md and post the findings on it as inline comments.
+description: Review a pull request against the repository's REVIEW.md and post the findings on it as inline comments. Use from /fishman-sdlc:push, or when asked to post a review on a pull request, not for a review the user only wants to read.
 argument-hint: "[PR number or URL; defaults to the current branch's PR]"
 ---
 
