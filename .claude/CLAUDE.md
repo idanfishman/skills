@@ -20,6 +20,7 @@ My agent skills, shipped as the `fishman` Claude Code marketplace. Each plugin i
 ## Gotchas
 
 - This repository is public. Keep names, paths and rules from my private repositories out of it.
+- `plugins/fishman-typescript/skills/styleguide/STYLEGUIDE.md` is my source of truth for TypeScript style. Never trim it to save context. `SKILL.md` beside it is the short part that loads into each session.
 - Each hook script has a `<name>_test.sh` beside it, which the gate runs. A hook change needs a test case.
 - `scripts/validate.sh` fails when the `plugin.json` versions differ, or when `CHANGELOG.md` has no section for that version. `scripts/release-notes.sh <version>` prints that section and then `.github/release-footer.md`. The release job publishes this output.
 - The release job creates a release only once. To fix the notes of a published release, edit `CHANGELOG.md`, then run `gh release edit v<version> --notes "$(scripts/release-notes.sh <version>)"`.

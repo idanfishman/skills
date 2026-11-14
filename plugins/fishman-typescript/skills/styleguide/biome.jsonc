@@ -1,0 +1,38 @@
+// The house Biome configuration. Copy it whole to the repository root, then add
+// the repository's own Ultracite presets to "extends" and its route folders to
+// the default-export override. It changes Ultracite's defaults where they differ
+// from the Google TypeScript Style Guide. Each comment names the id in
+// STYLEGUIDE.md that the setting holds. A setting without a comment is
+// Ultracite's own.
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core"],
+  "javascript": {
+    "formatter": {
+      // google#single-quotes. Ultracite keeps Biome's double quotes.
+      "quoteStyle": "single"
+    }
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        // google#array-type. The rule holds only one form, and Google uses two.
+        "useConsistentArrayType": "off",
+        // house#tool-default-exports. Ultracite turns it off.
+        "noDefaultExport": "error",
+        // house#strict-gate. Google's own for loops use i++.
+        "noIncrementDecrement": {
+          "level": "error",
+          "options": { "allowForLoopAfterthoughts": true }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      // house#tool-default-exports: tools that read a file's default export.
+      "includes": ["**/*.config.{ts,mts,cts,js,mjs}"],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    }
+  ]
+}
