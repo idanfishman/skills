@@ -46,7 +46,7 @@ When to use each part:
 | `/fishman-sdlc:review` | Skill | Runs the reviewer and posts its findings as inline PR comments. It never approves. |
 | `reviewer` | Agent: Opus, high effort | Reviews the diff against the repository's `REVIEW.md` and the change's intent, from a fresh context. It reports and never edits. |
 | `verifier` | Agent: Sonnet, medium effort | Runs the gate and exercises each scenario of the change, as its actor. It reports and never fixes. |
-| Merge gate | `PreToolUse` hook | Stops Claude from approving a PR, merging a critical PR, merging before every check passes, removing the `critical` label, and changing branch protection. |
+| Merge gate | `PreToolUse` hook | Stops Claude from merging a PR that has the `critical` label. |
 
 The short `/push` also works when no other command has that name. Claude Code has a built-in `/review`, so use `/fishman-sdlc:review`.
 
@@ -71,17 +71,13 @@ The short `/push` also works when no other command has that name. Claude Code ha
 
 2. In `CLAUDE.md`, name the gate: one command that runs every check and fails on error. "Done" includes its output.
 3. Add a `REVIEW.md`. It names the review passes in order, what counts as Important, the nit cap, and what not to report. Without one, the reviewer runs a bugs pass and a security pass.
-4. Create a `critical` label, and have CI add it to each PR that touches a path that needs your review, for example with [actions/labeler](https://github.com/actions/labeler). Without the label, Claude merges nothing.
+4. Create a `critical` label, and have CI add it to each PR that touches a path that needs your review, for example with [actions/labeler](https://github.com/actions/labeler). Without the label, Claude merges each PR whose checks pass.
 5. Optional: use [OpenSpec](https://github.com/Fission-AI/OpenSpec) for the intent of each change, with `openspec init --tools claude`. Without it, the PR body states the intent.
 
 ## The merge gate
 
-Claude may merge a PR only when all of these are true:
+The hook stops Claude from merging a PR that has the `critical` label. It checks `gh pr merge`, the merge and auto-merge routes of `gh api`, and the GitHub MCP merge tools. If it can't read the PR's labels, it blocks. It needs `jq`.
 
-- The repository has a `critical` label.
-- The PR does not carry the `critical` label.
-- The PR has at least one check, and every check on its head passed. This also holds for auto-merge, because GitHub waits only for required checks.
+The hook checks only the label. `/fishman-sdlc:push` waits for every check to pass before it merges.
 
-The hook never lets Claude approve a PR, merge with `--admin`, remove or rename the `critical` label with `gh`, or change branch protection or rulesets. It checks merges through `gh pr merge`, `gh api` and the GitHub MCP tools the same way. It reads GitHub only through the REST API, so it also works in Claude Code cloud sessions, which block GitHub's GraphQL API. The hook needs `jq`. When it can't run or can't read what it needs, it blocks.
-
-The hook stops a mistake, not an adversary. It matches the command line, so a deliberate bypass can route around it, such as a script, `bash -c`, an env prefix, a request body in a file or a browser. Where your GitHub plan allows it, add branch protection as the hard boundary.
+The hook stops a mistake, not an adversary. It reads the command line, so a deliberate bypass can route around it, such as a script or `bash -c`. Where your GitHub plan allows it, add branch protection as the hard boundary.

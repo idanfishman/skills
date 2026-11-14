@@ -23,5 +23,5 @@ At most five nits per review. Give the rest as a count.
 ## Do not report
 
 - What `scripts/validate.sh` already fails. CI reports it.
-- A route around a hook that only a deliberate bypass takes, such as a script, `bash -c`, an env prefix or a request body in a file. The hooks stop mistakes, and branch protection stops the rest.
+- A route around a hook that only a deliberate bypass takes, such as a script, `bash -c` or an env prefix. The hooks stop mistakes, and branch protection stops the rest.
 - Wording that is a matter of taste and already meets `fishman:no-fluff`.
