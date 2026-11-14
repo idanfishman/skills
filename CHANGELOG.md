@@ -16,9 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- The `fishman-typescript` plugin is a TypeScript style guide. The Google TypeScript Style Guide is the standard, and Ultracite on Biome enforces it. Turn it on per repository, as [its README](https://github.com/idanfishman/skills/tree/main/plugins/fishman-typescript) says.
+- The `fishman-typescript` plugin is a TypeScript style guide. The Google TypeScript Style Guide is the standard, and Ultracite on Biome enforces it. Turn it on per repository, as [its README](https://github.com/idanfishman/skills/tree/v1.3.0/plugins/fishman-typescript) says.
   - A hook loads the guide at session start, but only in a repository with a `tsconfig.json`.
-  - `STYLEGUIDE.md` lists every rule, with an id and the tool that holds it. The reviewer cites these ids and reports only the rules that no tool holds.
+  - `STYLEGUIDE.md` lists every rule, with an id and the tool that holds it. A reviewer, such as the `reviewer` agent of `fishman-sdlc`, cites these ids. It reports only the rules that no tool holds.
   - `biome.jsonc` extends Ultracite and changes its settings where they differ from Google, such as single quotes. Copy it to your repository root.
   - The guide departs from Google in four places. There is no `enum` and no parameter property, because Node strips types. File names are kebab-case, as the shadcn/ui CLI writes them. A default export is allowed only where a tool reads one. Where Biome bans what Google allows, such as `forEach` or `!`, the lint gate wins, and the escape is a `biome-ignore` comment with a reason.
 
@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- The `fishman-sdlc` plugin runs an AI-native SDLC. Claude does the work up to the merge, and you hold the merge gate. Turn it on per repository, as [its README](https://github.com/idanfishman/skills/tree/main/plugins/fishman-sdlc) says.
+- The `fishman-sdlc` plugin runs an AI-native SDLC. Claude does the work up to the merge, and you hold the merge gate. Turn it on per repository, as [its README](https://github.com/idanfishman/skills/tree/v1.2.0/plugins/fishman-sdlc) says.
   - `/fishman-sdlc:push` opens the PR and runs a verifier and a reviewer on it. It fixes what they find, for up to 2 rounds. Then it merges when every check passes. A PR with the `critical` label waits for you.
   - `/fishman-sdlc:review` runs the reviewer and posts its findings as inline PR comments. It never approves.
   - The `reviewer` agent checks the diff against the repository's `REVIEW.md` and the intent of the change. The `verifier` agent runs the gate and tries each scenario of the change as its actor. Both agents only report.
@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The marketplace now has two plugins. The `fishman` plugin keeps the writing skills, with no change to them. To get this version, run `claude plugin marketplace update fishman`.
+- The marketplace now has two plugins. The `fishman` plugin keeps the writing skills, with no change to them.
 
 ## [1.1.0] - 2026-11-13
 

@@ -18,7 +18,8 @@ done
 
 # The plugins release together, so they carry one version.
 versions="$(jq -r .version plugins/*/.claude-plugin/plugin.json | sort -u)"
-if [[ $(wc -l <<<"$versions") != 1 ]]; then
+# Arithmetic, because BSD wc on macOS pads the count with spaces.
+if (( $(wc -l <<<"$versions") != 1 )); then
   echo "The plugins carry different versions: $(tr '\n' ' ' <<<"$versions")" >&2
   exit 1
 fi
