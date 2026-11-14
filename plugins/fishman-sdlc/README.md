@@ -8,7 +8,7 @@ An AI-native SDLC (software development life cycle) for Claude Code. Claude does
 | `/fishman-sdlc:review` | Skill | Runs the reviewer and posts its findings as inline PR comments. It never approves. |
 | `reviewer` | Agent: Opus, high effort | Reviews the diff against the repository's `REVIEW.md` and the change's intent, from a fresh context. It reports and never edits. |
 | `verifier` | Agent: Sonnet, medium effort | Runs the gate and exercises each scenario of the change, as its actor. It reports and never fixes. |
-| Merge gate | `PreToolUse` hook | Stops Claude from approving a PR, merging a critical PR, merging before every check passes, and changing branch protection. |
+| Merge gate | `PreToolUse` hook | Stops Claude from approving a PR, merging a critical PR, merging before every check passes, removing the `critical` label, and changing branch protection. |
 
 The short `/push` also works when no other command has that name. Claude Code has a built-in `/review`, so use `/fishman-sdlc:review`.
 
@@ -52,6 +52,6 @@ Claude may merge a PR only when all of these are true:
 - The PR does not carry the `critical` label.
 - Every check on the PR's head passed. To arm auto-merge, the first two are enough, because GitHub waits for the checks.
 
-The hook never lets Claude approve a PR, merge with `--admin`, or change branch protection or rulesets. It checks `gh pr merge`, `gh api` and the GitHub MCP tools the same way. It reads GitHub only through the REST API, so it also works in Claude Code cloud sessions, which block GitHub's GraphQL API.
+The hook never lets Claude approve a PR, merge with `--admin`, remove or rename the `critical` label, or change branch protection or rulesets. It checks merges through `gh pr merge`, `gh api` and the GitHub MCP tools the same way, and it reads a request body that `gh api` takes from a file or stdin. It reads GitHub only through the REST API, so it also works in Claude Code cloud sessions, which block GitHub's GraphQL API.
 
-The hook matches the command line, so a script or a browser can route around it. It stops a mistake, not an adversary. Where your GitHub plan allows it, add branch protection as the hard boundary.
+The hook matches the command line, so a script, `bash -c` or a browser can route around it. It stops a mistake, not an adversary. Where your GitHub plan allows it, add branch protection as the hard boundary.
