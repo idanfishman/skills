@@ -21,4 +21,11 @@ if [[ -z "$section" ]]; then
 fi
 
 printf '%s\n\n' "$section"
+
+# The link reference of the version. If it is a compare link, print it, so the notes link to the diff.
+compare="$(awk -v v="$version" 'index($0, "[" v "]: ") == 1 { print $2 }' CHANGELOG.md)"
+if [[ "$compare" == */compare/* ]]; then
+  printf 'Full diff: [%s](%s)\n\n' "${compare##*/}" "$compare"
+fi
+
 cat .github/release-footer.md
