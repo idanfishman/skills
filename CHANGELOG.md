@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-14
+
+### Changed
+
+- Claude can now start `/fishman-sdlc:push` itself when you ask it to push or ship the work. Before, only you could start it, by typing the command. The merge gate still stops Claude from merging a critical PR or a PR that is not ready.
+
 ## [1.3.1] - 2026-11-14
 
 ### Changed
@@ -49,7 +55,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The `no-fluff` skill writes or rewrites text to a clear-writing standard based on ASD-STE100 Simplified Technical English. Run it as `/fishman:no-fluff [text or file]`. Give it a file path to rewrite that file, or a description to write new text. Claude also loads it when you ask for plain, simple or clear language.
 - The `come-again` skill tells Claude to explain its last answer again in `no-fluff` style. Claude first gives 2–3 sentences of context, then the answer. Run it as `/fishman:come-again [part]` to explain only one part. Claude loads it only when you run the command.
 
-[unreleased]: https://github.com/idanfishman/skills/compare/v1.3.1...HEAD
+[unreleased]: https://github.com/idanfishman/skills/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/idanfishman/skills/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/idanfishman/skills/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/idanfishman/skills/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/idanfishman/skills/compare/v1.1.0...v1.2.0

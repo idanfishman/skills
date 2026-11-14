@@ -1,6 +1,6 @@
 {
   "name": "fishman-sdlc",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "An AI-native SDLC: ship a PR with an independent verifier and reviewer, behind a merge gate you hold",
   "author": {
     "name": "Idan Fishman",
