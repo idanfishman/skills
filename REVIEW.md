@@ -11,6 +11,7 @@ This repository is a public plugin marketplace. Its hooks run in every session w
 2. **Context.** Load `fishman:context-engineering` and judge each `SKILL.md`, agent prompt and hook output against it. A finding is Important when:
    - two files that load together say different things.
    - a public file holds a name, path or rule from a private repository.
+   - the diff cuts a rule from `plugins/fishman-typescript/skills/styleguide/STYLEGUIDE.md`. It is the owner's source of truth, so it is never trimmed.
 3. **Release.** A diff that changes a plugin without a new version in every `plugin.json` is Important. A `CHANGELOG.md` entry that lists commits, not what changes for the plugin user, is Important.
 4. **Prose.** Prose follows `fishman:no-fluff`.
 

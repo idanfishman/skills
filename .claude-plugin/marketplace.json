@@ -16,6 +16,11 @@
       "name": "fishman-sdlc",
       "source": "./plugins/fishman-sdlc",
       "description": "An AI-native SDLC: ship a PR with an independent verifier and reviewer, behind a merge gate you hold"
+    },
+    {
+      "name": "fishman-typescript",
+      "source": "./plugins/fishman-typescript",
+      "description": "A TypeScript style guide: Google's guide as the standard, enforced by Ultracite on Biome"
     }
   ]
 }
