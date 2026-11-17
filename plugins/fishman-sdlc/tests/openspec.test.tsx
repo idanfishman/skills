@@ -85,6 +85,7 @@ const BOARD: Board = {
   touched: [],
   changes: [
     change({ key: 'add-google-sign-in', id: 'add-google-sign-in', title: 'Google sign-in', tasks: done(4, 5) }),
+    change({ key: 'cache-search-results', id: 'cache-search-results', title: 'Search caching', hasDesign: false, tasks: null }),
     change({ key: 'archive/2026-10-02-remove-legacy-export', id: '2026-10-02-remove-legacy-export', title: 'Legacy export cleanup', isArchived: true, tasks: done(4, 5) }),
   ],
 }
@@ -97,6 +98,8 @@ test('the board draws its columns and the archived unfinished task, on every sur
     const ui = await $.ui.mount({ ...PANE, surface })
     expect(await ui.find({ type: 'Text', text: /Implementation started 1/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /1 unfinished task/ })).toBeDefined()
+    // Its own line, as "Tasks 4 / 5" is: run into the title, the space before it was lost.
+    expect(await ui.find({ type: 'Text', text: /^Tasks not defined$/ })).toBeDefined()
     await ui.unmount()
   }
 })

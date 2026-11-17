@@ -371,9 +371,8 @@ export const register: Register = on => {
                 <Box flexDirection="column">
                   <Button key={`open-${c.key}`} plain onPress={setView({ sel: c.key, doc: v.doc, spec: 0, hint: '' })}>
                     {c.title}
-                    {progressOf(c).hasTasks ? null : <Text dimColor>{'  Tasks not defined'}</Text>}
                   </Button>
-                  {progress(c)}
+                  {progress(c) ?? <Text dimColor>Tasks not defined</Text>}
                   <Box flexDirection="row" gap="sm">
                     {summary(c)}
                     {isTouched(c) ? <Text color="claude">Claude edited</Text> : null}
