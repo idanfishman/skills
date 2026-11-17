@@ -1,15 +1,20 @@
 export type BoardTask = { num: string; text: string; isDone: boolean; section: string }
 
+export type BoardDoc = { id: string; pattern: string; status: string; files: string[] }
+
 export type BoardChange = {
   key: string
   id: string
   title: string
   dir: string
   isArchived: boolean
-  hasProposal: boolean
-  hasDesign: boolean
-  specs: string[]
+  schema: string
+  source: 'cli' | 'files'
+  docs: BoardDoc[]
+  isPlanningComplete: boolean
+  taskDoc: string | null
   tasks: BoardTask[] | null
+  updatedAt: number
 }
 
 export type Board = {
@@ -19,16 +24,19 @@ export type Board = {
   touched: string[]
 }
 
-export type BoardDoc = 'proposal' | 'specs' | 'design' | 'tasks'
-
 export type BoardView = {
   tab: 'changes' | 'tasks'
   sel: string | null
-  doc: BoardDoc
-  spec: number
+  // A document id from the Change's schema; null shows its first document.
+  doc: string | null
+  file: number
   filter: string
   showArchived: boolean
   hint: string
+  // The Changes view's search, filter and sort.
+  search: string
+  show: 'all' | 'active' | 'open' | 'archived'
+  sort: 'name' | 'recent' | 'progress' | 'open'
 }
 
 declare module 'claude-code' {

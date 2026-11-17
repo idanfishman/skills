@@ -14,7 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `fishman-sdlc` adds an OpenSpec board: a pane beside the chat that shows your OpenSpec Changes, their tasks and their planning documents. It opens by itself in a repository with an `openspec/` folder, and `/openspec` opens it again. See [its README](https://github.com/idanfishman/skills/tree/v1.4.0/plugins/fishman-sdlc#the-openspec-board).
   - Each Change sits in a column the board sets from its files, from Planning to Archived, and shows its checked tasks, such as `4 / 5`. An archived Change keeps its count, so its open tasks stay visible.
+  - Search, filter and sort the Changes. Search matches a title or a folder name. Filter to the Changes not archived, with open tasks or archived. Sort by name, recent edits, tasks done or open tasks.
   - A Tasks view lists every task as Open or Completed, filtered by Change.
+  - The board follows each Change's OpenSpec schema, a custom one too. It asks the `openspec` CLI which documents the schema has and where its tasks are. Without the CLI, it reads every Change as the default `spec-driven` schema.
   - The board is read-only. Its buttons put an `/opsx:*` command in the prompt box, and nothing runs until you send it.
   - It refreshes when Claude edits a file in `openspec/`, and every 5 seconds for other edits.
 

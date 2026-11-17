@@ -1,71 +1,153 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Board, BoardChange, BoardDoc, BoardView } from '../types'
-import { COLUMNS, columnOf, countOf, parseTasks, progressOf, summaryOf, titleOf } from './openspec'
+import type { Board, BoardChange, BoardView } from '../types'
+import {
+  COLUMNS,
+  columnOf,
+  countOf,
+  docLabel,
+  docName,
+  parseStatus,
+  parseTasks,
+  progressOf,
+  SHOW_OPTIONS,
+  SORT_OPTIONS,
+  specDrivenStatus,
+  summaryOf,
+  titleOf,
+  visibleChanges,
+} from './openspec'
+import type { ShowFilter, SortOrder } from './openspec'
 
 const PANE = 'openspec'
 const POLL_MS = 5000
+const CLI_RUNS_AT_ONCE = 4
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
-const DOCS: readonly { id: BoardDoc; label: string }[] = [
-  { id: 'proposal', label: 'Proposal' },
-  { id: 'specs', label: 'Specs' },
-  { id: 'design', label: 'Design' },
-  { id: 'tasks', label: 'Tasks' },
-]
 
 const EMPTY_BOARD: Board = { found: 'unknown', changes: [], touched: [] }
-const START_VIEW: BoardView = { tab: 'changes', sel: null, doc: 'proposal', spec: 0, filter: 'all', showArchived: true, hint: '' }
-const board = atom({ plugin: 'fishman-sdlc', key: 'board' } as const, EMPTY_BOARD, { shape: 'board-1' })
-const view = atom({ plugin: 'fishman-sdlc', key: 'view' } as const, START_VIEW, { shape: 'view-1' })
+const START_VIEW: BoardView = {
+  tab: 'changes',
+  sel: null,
+  doc: null,
+  file: 0,
+  filter: 'all',
+  showArchived: true,
+  hint: '',
+  search: '',
+  show: 'all',
+  sort: 'name',
+}
+const board = atom({ plugin: 'fishman-sdlc', key: 'board' } as const, EMPTY_BOARD, { shape: 'board-2' })
+const view = atom({ plugin: 'fishman-sdlc', key: 'view' } as const, START_VIEW, { shape: 'view-2' })
 
-async function specFiles($: EngineInterface, dir: string): Promise<string[]> {
-  const entries = await $.fs.list(dir)
-  const found = await Promise.all(
-    entries
-      .filter(entry => entry.kind === 'dir')
-      .map(async entry => ((await $.fs.exists(`${dir}/${entry.name}/spec.md`)) ? `${entry.name}/spec.md` : null)),
-  )
-  return found.filter((file): file is string => file !== null).sort()
+// A Change is read again, and the CLI asked again, only when a file of it or of the schemas changed.
+const cache = new Map<string, { signature: string; change: BoardChange }>()
+let hasCli = true
+
+type FileStamp = { path: string; mtimeMs: number }
+
+async function walk($: EngineInterface, dir: string, depth = 0): Promise<FileStamp[]> {
+  if (!(await $.fs.exists(dir))) return []
+  const stamps: FileStamp[] = []
+  for (const entry of await $.fs.list(dir)) {
+    const path = `${dir}/${entry.name}`
+    if (entry.kind === 'file') stamps.push({ path, mtimeMs: entry.mtimeMs })
+    else if (entry.kind === 'dir' && depth < 4) stamps.push(...(await walk($, path, depth + 1)))
+  }
+  return stamps
 }
 
-async function readChange($: EngineInterface, parent: string, name: string, isArchived: boolean): Promise<BoardChange> {
+const signatureOf = (stamps: FileStamp[]) => stamps.map(s => `${s.path}:${s.mtimeMs}`).join('|')
+
+/** The schema as OpenSpec resolves it: the CLI reads config.yaml, a Change's .openspec.yaml and openspec/schemas/. */
+async function cliStatus($: EngineInterface, root: string, name: string) {
+  if (!hasCli) return null
+  try {
+    const { exitCode, stdout } = await $.process.run(['openspec', 'status', '--change', name, '--json'], { cwd: root, timeoutMs: 15000 })
+    return exitCode === 0 ? parseStatus(stdout) : null
+  } catch {
+    // The command does not start: no CLI on this machine. Every Change uses the default layout.
+    hasCli = false
+    return null
+  }
+}
+
+async function readText($: EngineInterface, path: string | undefined): Promise<string | null> {
+  if (!path) return null
+  try {
+    return await $.fs.read(path)
+  } catch {
+    return null
+  }
+}
+
+async function readChange($: EngineInterface, root: string, schemaSignature: string, parent: string, name: string, isArchived: boolean): Promise<BoardChange> {
   const dir = `${parent}/${name}`
-  const [hasProposal, hasDesign, hasTasks, hasSpecs] = await Promise.all(
-    ['proposal.md', 'design.md', 'tasks.md', 'specs'].map(file => $.fs.exists(`${dir}/${file}`)),
-  )
-  const [proposal, tasksText, specs] = await Promise.all([
-    hasProposal ? $.fs.read(`${dir}/proposal.md`) : Promise.resolve(''),
-    hasTasks ? $.fs.read(`${dir}/tasks.md`) : Promise.resolve(null),
-    hasSpecs ? specFiles($, `${dir}/specs`) : Promise.resolve([]),
-  ])
-  return {
+  const stamps = await walk($, dir)
+  const signature = `${schemaSignature}#${signatureOf(stamps)}`
+  const cached = cache.get(dir)
+  if (cached && cached.signature === signature) return cached.change
+
+  // shortcut: `openspec status` reads only active Changes, so an archived one is read as spec-driven; read its .openspec.yaml if archived custom-schema Changes matter.
+  const fromCli = isArchived ? null : await cliStatus($, root, name)
+  const paths = stamps.map(s => s.path)
+  const has = (file: string) => (paths.includes(`${dir}/${file}`) ? [`${dir}/${file}`] : [])
+  const status =
+    fromCli ??
+    specDrivenStatus({
+      proposal: has('proposal.md'),
+      specs: paths.filter(p => p.startsWith(`${dir}/specs/`) && p.endsWith('.md')).sort(),
+      design: has('design.md'),
+      tasks: has('tasks.md'),
+    })
+  const taskFile = status.docs.find(doc => doc.id === status.taskDoc)?.files[0]
+  const [firstText, taskText] = await Promise.all([readText($, status.docs[0]?.files[0]), readText($, taskFile)])
+  const change: BoardChange = {
     key: isArchived ? `archive/${name}` : name,
     id: name,
-    title: titleOf(proposal, name),
+    title: titleOf(firstText ?? '', name),
     dir,
     isArchived,
-    hasProposal: hasProposal === true,
-    hasDesign: hasDesign === true,
-    specs,
-    tasks: tasksText === null ? null : parseTasks(tasksText),
+    source: fromCli ? 'cli' : 'files',
+    ...status,
+    tasks: taskText === null ? null : parseTasks(taskText),
+    updatedAt: stamps.reduce((newest, s) => Math.max(newest, s.mtimeMs), 0),
   }
+  cache.set(dir, { signature, change })
+  return change
+}
+
+async function inPool<T, R>(items: T[], size: number, work: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = []
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      const item = items[i]
+      if (item !== undefined) results[i] = await work(item)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(size, items.length) }, worker))
+  return results
 }
 
 async function scan($: EngineInterface): Promise<Pick<Board, 'found' | 'changes'>> {
   const root = await $.session.root()
   if (!(await $.fs.exists(`${root}/openspec`))) return { found: 'none', changes: [] }
   const changesDir = `${root}/openspec/changes`
+  const schemaStamps = [...(await walk($, `${root}/openspec/schemas`))]
+  if (await $.fs.exists(`${root}/openspec/config.yaml`)) {
+    schemaStamps.push({ path: 'config.yaml', mtimeMs: (await $.fs.stat(`${root}/openspec/config.yaml`)).mtimeMs })
+  }
+  const schemaSignature = signatureOf(schemaStamps)
   const listIn = async (dir: string, isArchived: boolean) => {
     if (!(await $.fs.exists(dir))) return []
-    const entries = await $.fs.list(dir)
-    return Promise.all(
-      entries
-        .filter(entry => entry.kind === 'dir' && entry.name !== 'archive')
-        .map(entry => readChange($, dir, entry.name, isArchived)),
-    )
+    const names = (await $.fs.list(dir)).filter(entry => entry.kind === 'dir' && entry.name !== 'archive').map(entry => entry.name)
+    return inPool(names, CLI_RUNS_AT_ONCE, name => readChange($, root, schemaSignature, dir, name, isArchived))
   }
-  const [active, archived] = await Promise.all([listIn(changesDir, false), listIn(`${changesDir}/archive`, true)])
+  const active = await listIn(changesDir, false)
+  const archived = await listIn(`${changesDir}/archive`, true)
   active.sort((a, b) => a.id.localeCompare(b.id))
   // Archive folders start with their date, so newest first.
   archived.sort((a, b) => b.id.localeCompare(a.id))
@@ -87,13 +169,29 @@ function differences(before: BoardChange[], after: BoardChange[]): string[] {
   return notes
 }
 
-async function refresh($: EngineInterface): Promise<void> {
-  const next = await scan($)
-  const prev = await read($, board)
-  if (prev.found === next.found && JSON.stringify(prev.changes) === JSON.stringify(next.changes)) return
-  await update($, board, current => ({ ...current, ...next }))
-  if (prev.found !== 'ok') return
-  for (const note of differences(prev.changes, next.changes).slice(0, 3)) $.ui.toast(`OpenSpec: ${note}`)
+let running: Promise<void> | null = null
+let runAgain = false
+
+/** One scan at a time; a call during a scan runs one more after it, so the last edit is never missed. */
+function refresh($: EngineInterface): Promise<void> {
+  if (running) {
+    runAgain = true
+    return running
+  }
+  running = (async () => {
+    do {
+      runAgain = false
+      const next = await scan($)
+      const prev = await read($, board)
+      if (prev.found === next.found && JSON.stringify(prev.changes) === JSON.stringify(next.changes)) continue
+      await update($, board, current => ({ ...current, ...next }))
+      if (prev.found !== 'ok') continue
+      for (const note of differences(prev.changes, next.changes).slice(0, 3)) $.ui.toast(`OpenSpec: ${note}`)
+    } while (runAgain)
+  })().finally(() => {
+    running = null
+  })
+  return running
 }
 
 function changeKeyOfPath(path: string): string | null {
@@ -105,8 +203,11 @@ function changeKeyOfPath(path: string): string | null {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'openspec', description: 'Show the OpenSpec board for this repository' })
-    await refresh($)
-    if ((await read($, board)).found === 'ok') void $.ui.open({ id: PANE, title: 'OpenSpec' })
+    // The first scan asks the CLI about every Change, so it runs after the session is up.
+    $.clock.after(0, async () => {
+      await refresh($)
+      if ((await read($, board)).found === 'ok') void $.ui.open({ id: PANE, title: 'OpenSpec' })
+    })
     $.clock.every(POLL_MS, () => {
       void refresh($)
     })
@@ -114,8 +215,8 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'openspec' }, async $ => {
-    await refresh($)
     await $.ui.open({ id: PANE, title: 'OpenSpec' })
+    void refresh($)
     return { text: 'OpenSpec board opened.' }
   })
 
@@ -139,7 +240,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Select, Markdown, Progress, Link } = $.ui.resolve(e)
+    const { Box, Text, Button, Input, Select, Markdown, Progress, Link } = $.ui.resolve(e)
     const b = await read($, board)
     const v = await read($, view)
     const setView = (patch: Partial<BoardView>) => () => {
@@ -201,18 +302,12 @@ export const register: Register = on => {
       const nextChange = ordered[at + 1]
       const p = progressOf(cur)
       const s = summaryOf(cur)
-      const has: Record<BoardDoc, boolean> = { proposal: cur.hasProposal, specs: cur.specs.length > 0, design: cur.hasDesign, tasks: cur.tasks !== null }
-      const specIndex = Math.min(v.spec, Math.max(0, cur.specs.length - 1))
-      const fileOf: Record<BoardDoc, string> = { proposal: 'proposal.md', specs: `specs/${cur.specs[specIndex] ?? ''}`, design: 'design.md', tasks: 'tasks.md' }
-      const filePath = `${cur.dir}/${fileOf[v.doc]}`
-      let text = ''
-      if (has[v.doc] && v.doc !== 'tasks') {
-        try {
-          text = await $.fs.read(filePath)
-        } catch {
-          text = ''
-        }
-      }
+      const doc = cur.docs.find(d => d.id === v.doc) ?? cur.docs[0]
+      const isTaskDoc = doc !== undefined && doc.id === cur.taskDoc
+      const fileIndex = doc ? Math.min(v.file, Math.max(0, doc.files.length - 1)) : 0
+      const filePath = doc?.files[fileIndex] ?? (doc ? `${cur.dir}/${docName(doc)}` : cur.dir)
+      const relative = (path: string) => (path.startsWith(`${cur.dir}/`) ? path.slice(cur.dir.length + 1) : path)
+      const text = doc && doc.files.length > 0 && !isTaskDoc ? await readText($, filePath) : null
       const commands: Record<string, [string, string][]> = {
         planning: [['Continue planning', `/opsx:continue ${cur.id}`]],
         ready: [['Start implementing', `/opsx:apply ${cur.id}`], ['Revise plan', `/opsx:update ${cur.id}`]],
@@ -227,21 +322,26 @@ export const register: Register = on => {
         if (last && last.name === task.section) last.tasks.push(task)
         else sections.push({ name: task.section, tasks: [task] })
       }
+      let missingText = ''
+      if (doc && doc.files.length === 0) {
+        if (doc.status === 'skipped') missingText = `This Change skips ${docName(doc)}.`
+        else if (isTaskDoc) missingText = `This Change has no ${docName(doc)} yet, so its tasks are not defined. That is not 0% done.`
+        else missingText = `This Change has no ${docName(doc)} yet.`
+      }
 
       return (
         <Box flexDirection="column" gap="sm">
           {tabs}
           <Box flexDirection="row" gap="sm">
             <Button key="back" label={`← ${v.tab === 'tasks' ? 'Tasks' : 'Changes'}`} onPress={setView({ sel: null, hint: '' })} />
-            {prev ? <Button key="prev" label="Previous" onPress={setView({ sel: prev.key, hint: '' })} /> : null}
-            {nextChange ? <Button key="next" label="Next" onPress={setView({ sel: nextChange.key, hint: '' })} /> : null}
+            {prev ? <Button key="prev" label="Previous" onPress={setView({ sel: prev.key, doc: null, file: 0, hint: '' })} /> : null}
+            {nextChange ? <Button key="next" label="Next" onPress={setView({ sel: nextChange.key, doc: null, file: 0, hint: '' })} /> : null}
           </Box>
           <Box flexDirection="column" gap="xs">
             <Text size="heading" bold>{cur.title}</Text>
             <Text mono dimColor>{cur.id}</Text>
-            <Text>
-              {p.hasTasks ? `${p.done} of ${p.total} tasks checked` : 'Tasks not defined'} · {columnLabel(cur)}
-            </Text>
+            <Text dimColor>{`Schema: ${cur.schema}${cur.source === 'files' ? ' (read from the files, not the openspec CLI)' : ''}`}</Text>
+            <Text>{`${p.hasTasks ? `${p.done} of ${p.total} tasks checked` : 'Tasks not defined'} · ${columnLabel(cur)}`}</Text>
             {progress(cur)}
             {s.isWarning || !p.hasTasks || columnOf(cur) === 'complete' ? summary(cur) : null}
             {isTouched(cur) ? <Text color="claude">Claude edited this Change in this session</Text> : null}
@@ -254,40 +354,35 @@ export const register: Register = on => {
             ) : null}
           </Box>
           <Box flexDirection="row" gap="xs" flexWrap="wrap">
-            {DOCS.map(doc => (
-              <Button
-                key={`doc-${doc.id}`}
-                variant={v.doc === doc.id ? 'primary' : 'secondary'}
-                label={has[doc.id] ? doc.label : `${doc.label} · missing`}
-                onPress={setView({ doc: doc.id, spec: 0, hint: '' })}
-              />
-            ))}
+            {cur.docs.map(d => {
+              let label = docLabel(d)
+              if (d.files.length === 0) label += d.status === 'skipped' ? ' · skipped' : ' · missing'
+              return (
+                <Button key={`doc-${d.id}`} variant={doc?.id === d.id ? 'primary' : 'secondary'} label={label} onPress={setView({ doc: d.id, file: 0, hint: '' })} />
+              )
+            })}
           </Box>
-          {v.doc === 'specs' && cur.specs.length > 1 ? (
+          {doc && doc.files.length > 1 && !isTaskDoc ? (
             <Select
-              key="spec-file"
+              key="doc-file"
               label="File"
-              value={String(specIndex)}
-              options={cur.specs.map((file, i) => ({ value: String(i), label: file }))}
+              value={String(fileIndex)}
+              options={doc.files.map((file, i) => ({ value: String(i), label: relative(file) }))}
               onSelect={value => {
-                void update($, view, current => ({ ...current, spec: Number(value) }))
+                void update($, view, current => ({ ...current, file: Number(value) }))
               }}
             />
           ) : null}
-          <Text mono dimColor>{`${fileOf[v.doc]} · read-only`}</Text>
-          {has[v.doc] ? null : (
+          <Text mono dimColor>{`${relative(filePath)} · read-only`}</Text>
+          {missingText ? (
             <Box borderStyle="dashed" borderDimColor paddingX={1}>
-              <Text dimColor>
-                {v.doc === 'tasks'
-                  ? 'This Change has no tasks.md yet, so its tasks are not defined. That is not 0% done.'
-                  : `This Change has no ${fileOf[v.doc]} yet.`}
-              </Text>
+              <Text dimColor>{missingText}</Text>
             </Box>
-          )}
-          {has[v.doc] && v.doc !== 'tasks' ? <Markdown key="doc" text={text || '(empty file)'} /> : null}
-          {v.doc === 'tasks' && cur.tasks ? (
+          ) : null}
+          {text !== null ? <Markdown key="doc" text={text || '(empty file)'} /> : null}
+          {isTaskDoc && cur.tasks ? (
             <Box flexDirection="column" gap="xs">
-              {cur.tasks.length === 0 ? <Text dimColor>tasks.md has no checkboxes yet.</Text> : null}
+              {cur.tasks.length === 0 ? <Text dimColor>{`${relative(filePath)} has no checkboxes yet.`}</Text> : null}
               {sections.map(section => (
                 <Box flexDirection="column">
                   {section.name ? <Text bold>{section.name}</Text> : null}
@@ -328,7 +423,7 @@ export const register: Register = on => {
             {list.length === 0 ? <Text dimColor>None for this filter.</Text> : null}
             {list.map(({ c, task, i }) => (
               <Box flexDirection="column">
-                <Button key={`task-${c.key}-${i}`} plain onPress={setView({ sel: c.key, doc: 'tasks', hint: '' })}>
+                <Button key={`task-${c.key}-${i}`} plain onPress={setView({ sel: c.key, doc: c.taskDoc, file: 0, hint: '' })}>
                   {`${isDone ? '☑' : '☐'} ${task.text} `}
                   <Text dimColor>{`${c.title} · ${task.num}`}</Text>
                 </Button>
@@ -351,25 +446,68 @@ export const register: Register = on => {
             }}
           />
           <Button key="archived" label={v.showArchived ? 'Archived Changes: shown' : 'Archived Changes: hidden'} onPress={setView({ showArchived: !v.showArchived })} />
-          {undefinedTitles.length ? <Text dimColor>{`No tasks.md yet: ${undefinedTitles.join(', ')}`}</Text> : null}
+          {undefinedTitles.length ? <Text dimColor>{`Tasks not defined: ${undefinedTitles.join(', ')}`}</Text> : null}
           {group('Open', false)}
           {group('Completed', true)}
         </Box>
       )
     }
 
+    const active = b.changes.filter(c => !c.isArchived)
+    const readByCli = active.some(c => c.source === 'cli')
+    const shown = visibleChanges(b.changes, v.search, v.show, v.sort)
+    const isNarrowed = v.search.trim() !== '' || v.show !== 'all'
     return (
       <Box flexDirection="column" gap="sm">
         {tabs}
+        <Input
+          key="search"
+          label="Search"
+          placeholder="Title or folder name"
+          value={v.search}
+          onInput={value => {
+            void update($, view, current => ({ ...current, search: value }))
+          }}
+          onSubmit={value => {
+            void update($, view, current => ({ ...current, search: value }))
+          }}
+        />
+        <Box flexDirection="row" gap="sm" flexWrap="wrap">
+          <Select
+            key="show"
+            label="Show"
+            value={v.show}
+            options={SHOW_OPTIONS}
+            onSelect={value => {
+              void update($, view, current => ({ ...current, show: value as ShowFilter }))
+            }}
+          />
+          <Select
+            key="sort"
+            label="Sort"
+            value={v.sort}
+            options={SORT_OPTIONS}
+            onSelect={value => {
+              void update($, view, current => ({ ...current, sort: value as SortOrder }))
+            }}
+          />
+        </Box>
+        {isNarrowed ? (
+          <Box flexDirection="row" gap="sm">
+            <Text dimColor>{`${shown.length} of ${b.changes.length} Changes`}</Text>
+            <Button key="clear" plain label="Clear" onPress={setView({ search: '', show: 'all' })} />
+          </Box>
+        ) : null}
         {COLUMNS.map(col => {
-          const list = b.changes.filter(c => columnOf(c) === col.id)
+          const list = shown.filter(c => columnOf(c) === col.id)
+          if (isNarrowed && list.length === 0) return null
           return (
             <Box flexDirection="column" gap="xs" paddingTop={1}>
               <Text bold>{`${col.label} ${list.length}`}</Text>
               {list.length === 0 ? <Text dimColor>None</Text> : null}
               {list.map(c => (
                 <Box flexDirection="column">
-                  <Button key={`open-${c.key}`} plain onPress={setView({ sel: c.key, doc: v.doc, spec: 0, hint: '' })}>
+                  <Button key={`open-${c.key}`} plain onPress={setView({ sel: c.key, doc: null, file: 0, hint: '' })}>
                     {c.title}
                   </Button>
                   {progress(c) ?? <Text dimColor>Tasks not defined</Text>}
@@ -383,6 +521,9 @@ export const register: Register = on => {
           )
         })}
         <Text dimColor>Columns follow the files. They are not OpenSpec statuses.</Text>
+        {active.length > 0 && !readByCli ? (
+          <Text dimColor>The openspec CLI did not answer, so every Change is read as the default spec-driven schema.</Text>
+        ) : null}
       </Box>
     )
   })

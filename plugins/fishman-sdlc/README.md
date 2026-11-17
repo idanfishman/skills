@@ -92,10 +92,18 @@ The hook stops a mistake, not an adversary. It reads the command line, so a deli
 
 The board reads `openspec/changes/` and its archive. It is read-only: files stay the source of truth.
 
-- **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning while `proposal.md`, `specs/`, `design.md` or `tasks.md` is missing.
-- Each Change shows its checked tasks, such as `4 / 5`, and a bar. A Change with no `tasks.md` shows "Tasks not defined", not 0%. An archived Change keeps its count, and its open tasks show as unfinished. Checked tasks and archiving do not mean that tests passed or that code shipped.
+- **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning until its schema's planning documents all exist and its task document has tasks.
+- Each Change shows its checked tasks, such as `4 / 5`, and a bar. A Change with no task document shows "Tasks not defined", not 0%. An archived Change keeps its count, and its open tasks show as unfinished. Checked tasks and archiving do not mean that tests passed or that code shipped.
+- Search the Changes by title or folder name. Filter them to the ones not archived, the ones with open tasks or the archived ones. Sort them by name, by the most recent edit, by the most tasks done or by the most open tasks.
 - **Tasks** lists every task in two groups, Open and Completed. You can filter by Change and hide archived Changes.
-- Pick a Change to read its proposal, specs, design and tasks. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
+- Pick a Change to read its documents. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
 - The board refreshes at once when Claude edits a file in `openspec/`, and every 5 seconds for edits from other tools. "Claude edited" marks a Change whose files Claude edited in this session.
+
+### Custom schemas
+
+The board follows the schema of each Change, as OpenSpec resolves it: from the Change's `.openspec.yaml`, from `openspec/config.yaml`, or the default `spec-driven`. It asks the `openspec` CLI with `openspec status --change <name> --json`, so a schema in `openspec/schemas/` brings its own documents to the board. The tasks come from the document that the schema's apply step requires.
+
+- Without the `openspec` CLI on the path, the board reads every Change as `spec-driven` and says so.
+- The CLI does not read archived Changes, so the board reads them as `spec-driven` too.
 
 The board is a mod, which uses the early-access Claude Code plugin API. It draws with the elements every surface has, so it works in the terminal and in the desktop app.
