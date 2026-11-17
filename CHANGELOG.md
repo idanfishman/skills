@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-![The OpenSpec board: the Changes view, and a spec of the Google sign-in Change](https://github.com/idanfishman/skills/raw/v1.4.0/.github/assets/openspec-board.png)
+![The OpenSpec board: the Changes view, and a spec of the Google sign-in Change](https://github.com/idanfishman/skills/raw/v1.4.0/.github/assets/openspec-board.webp)
 
 - `fishman-sdlc` adds an OpenSpec board: a pane beside the chat that shows your OpenSpec Changes, their tasks and their planning documents. It opens by itself in a repository with an `openspec/` folder, and `/openspec` opens it again. See [its README](https://github.com/idanfishman/skills/tree/v1.4.0/plugins/fishman-sdlc#the-openspec-board).
   - Each Change sits in a column the board sets from its files, from Planning to Archived, and shows its checked tasks, such as `4 / 5`. An archived Change keeps its count, so its open tasks stay visible.
