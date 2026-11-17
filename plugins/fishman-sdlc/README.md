@@ -88,6 +88,8 @@ The hook stops a mistake, not an adversary. It reads the command line, so a deli
 
 ## The OpenSpec board
 
+![The OpenSpec board: the Changes view, and a spec of the Google sign-in Change](../../.github/assets/openspec-board.png)
+
 The board reads `openspec/changes/` and its archive. It is read-only: files stay the source of truth.
 
 - **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning while `proposal.md`, `specs/`, `design.md` or `tasks.md` is missing.
