@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-17
+
+### Added
+
+- `fishman-sdlc` adds an OpenSpec board: a pane beside the chat that shows your OpenSpec Changes, their tasks and their planning documents. It opens by itself in a repository with an `openspec/` folder, and `/openspec` opens it again. See [its README](https://github.com/idanfishman/skills/tree/v1.4.0/plugins/fishman-sdlc#the-openspec-board).
+  - Each Change sits in a column the board sets from its files, from Planning to Archived, and shows its checked tasks, such as `4 / 5`. An archived Change keeps its count, so its open tasks stay visible.
+  - A Tasks view lists every task as Open or Completed, filtered by Change.
+  - The board is read-only. Its buttons put an `/opsx:*` command in the prompt box, and nothing runs until you send it.
+  - It refreshes when Claude edits a file in `openspec/`, and every 5 seconds for other edits.
+
 ## [1.3.2] - 2026-11-14
 
 ### Changed
@@ -55,7 +65,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The `no-fluff` skill writes or rewrites text to a clear-writing standard based on ASD-STE100 Simplified Technical English. Run it as `/fishman:no-fluff [text or file]`. Give it a file path to rewrite that file, or a description to write new text. Claude also loads it when you ask for plain, simple or clear language.
 - The `come-again` skill tells Claude to explain its last answer again in `no-fluff` style. Claude first gives 2–3 sentences of context, then the answer. Run it as `/fishman:come-again [part]` to explain only one part. Claude loads it only when you run the command.
 
-[unreleased]: https://github.com/idanfishman/skills/compare/v1.3.2...HEAD
+[unreleased]: https://github.com/idanfishman/skills/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/idanfishman/skills/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/idanfishman/skills/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/idanfishman/skills/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/idanfishman/skills/compare/v1.2.0...v1.3.0

@@ -15,6 +15,12 @@ shellcheck scripts/*.sh plugins/*/hooks/*.sh
 for test in plugins/*/hooks/*_test.sh; do
   bash "$test"
 done
+# A hooks module keeps its tests in the plugin's tests/ folder.
+for plugin in plugins/*/; do
+  if [[ -d "$plugin/tests" ]]; then
+    claude plugin test "$plugin"
+  fi
+done
 
 # The plugins release together, so they carry one version.
 versions="$(jq -r .version plugins/*/.claude-plugin/plugin.json | sort -u)"

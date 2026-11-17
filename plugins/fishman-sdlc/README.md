@@ -47,6 +47,7 @@ When to use each part:
 | `reviewer` | Agent: Opus, high effort | Reviews the diff against the repository's `REVIEW.md` and the change's intent, from a fresh context. It reports and never edits. |
 | `verifier` | Agent: Sonnet, medium effort | Runs the gate and exercises each scenario of the change, as its actor. It reports and never fixes. |
 | Merge gate | `PreToolUse` hook | Stops Claude from merging a PR that has the `critical` label, or whose checks have not all passed. |
+| OpenSpec board | Mod: a pane beside the chat | Shows the repository's OpenSpec Changes, their tasks and their planning documents. It opens by itself in a repository with an `openspec/` folder. `/openspec` opens it again. |
 
 The short `/push` also works when no other command has that name. Claude Code has a built-in `/review`, so use `/fishman-sdlc:review`.
 
@@ -84,3 +85,15 @@ The hook stops Claude from merging a PR in two cases:
 It checks `gh pr merge`, the merge and auto-merge routes of `gh api`, and the GitHub MCP merge tools. Auto-merge gets the same rule, because without required checks GitHub can merge at once. If the hook can't read the PR's labels or checks, it blocks. It needs `jq`.
 
 The hook stops a mistake, not an adversary. It reads the command line, so a deliberate bypass can route around it, such as a script or `bash -c`. Where your GitHub plan allows it, add branch protection as the hard boundary.
+
+## The OpenSpec board
+
+The board reads `openspec/changes/` and its archive. It is read-only: files stay the source of truth.
+
+- **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning while `proposal.md`, `specs/`, `design.md` or `tasks.md` is missing.
+- Each Change shows its checked tasks, such as `4 / 5`, and a bar. A Change with no `tasks.md` shows "Tasks not defined", not 0%. An archived Change keeps its count, and its open tasks show as unfinished. Checked tasks and archiving do not mean that tests passed or that code shipped.
+- **Tasks** lists every task in two groups, Open and Completed. You can filter by Change and hide archived Changes.
+- Pick a Change to read its proposal, specs, design and tasks. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
+- The board refreshes at once when Claude edits a file in `openspec/`, and every 5 seconds for edits from other tools. "Claude edited" marks a Change whose files Claude edited in this session.
+
+The board is a mod, which uses the early-access Claude Code plugin API. It draws with the elements every surface has, so it works in the terminal and in the desktop app.
