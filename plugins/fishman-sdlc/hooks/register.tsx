@@ -10,15 +10,20 @@ import {
   docName,
   parseStatus,
   parseTasks,
+  layoutFromFiles,
+  layoutOf,
   progressOf,
+  schemaNameOf,
   SHOW_OPTIONS,
+  skipsSpecsOf,
   SORT_OPTIONS,
-  specDrivenStatus,
+  SPEC_DRIVEN_LAYOUT,
+  statusFromFiles,
   summaryOf,
   titleOf,
   visibleChanges,
 } from './openspec'
-import type { ShowFilter, SortOrder } from './openspec'
+import type { Layout, ShowFilter, SortOrder, Status } from './openspec'
 
 const PANE = 'openspec'
 const POLL_MS = 5000
@@ -82,25 +87,42 @@ async function readText($: EngineInterface, path: string | undefined): Promise<s
   }
 }
 
-async function readChange($: EngineInterface, root: string, schemaSignature: string, parent: string, name: string, isArchived: boolean): Promise<BoardChange> {
+type ScanContext = {
+  root: string
+  // Changes the files of the schemas or config.yaml; part of every cache key.
+  schemaSignature: string
+  configYaml: string | null
+  // Each schema's layout, as the CLI gave it for an active Change.
+  layouts: Map<string, Layout>
+}
+
+/** A Change the CLI does not read: archived, or no CLI. Its schema's layout comes from an active Change, else from its files. */
+async function statusWithoutCli($: EngineInterface, ctx: ScanContext, dir: string, paths: string[]): Promise<Status> {
+  const changeYaml = await readText($, `${dir}/.openspec.yaml`)
+  const schema = schemaNameOf(changeYaml, ctx.configYaml)
+  const skipsSpecs = skipsSpecsOf(changeYaml)
+  const known = schema === 'spec-driven' ? SPEC_DRIVEN_LAYOUT : ctx.layouts.get(schema)
+  if (known) return statusFromFiles(known, dir, paths, skipsSpecs)
+  const status = statusFromFiles(layoutFromFiles(schema, dir, paths), dir, paths, skipsSpecs)
+  for (const doc of status.docs) {
+    const text = await readText($, doc.files[0])
+    if (text && parseTasks(text).length > 0) return { ...status, taskDoc: doc.id }
+  }
+  return status
+}
+
+async function readChange($: EngineInterface, ctx: ScanContext, parent: string, name: string, isArchived: boolean): Promise<BoardChange> {
   const dir = `${parent}/${name}`
   const stamps = await walk($, dir)
-  const signature = `${schemaSignature}#${signatureOf(stamps)}`
+  const layoutsKey = isArchived ? JSON.stringify([...ctx.layouts]) : ''
+  const signature = `${ctx.schemaSignature}#${layoutsKey}#${signatureOf(stamps)}`
   const cached = cache.get(dir)
   if (cached && cached.signature === signature) return cached.change
 
-  // shortcut: `openspec status` reads only active Changes, so an archived one is read as spec-driven; read its .openspec.yaml if archived custom-schema Changes matter.
-  const fromCli = isArchived ? null : await cliStatus($, root, name)
+  // `openspec status` reads only active Changes.
+  const fromCli = isArchived ? null : await cliStatus($, ctx.root, name)
   const paths = stamps.map(s => s.path)
-  const has = (file: string) => (paths.includes(`${dir}/${file}`) ? [`${dir}/${file}`] : [])
-  const status =
-    fromCli ??
-    specDrivenStatus({
-      proposal: has('proposal.md'),
-      specs: paths.filter(p => p.startsWith(`${dir}/specs/`) && p.endsWith('.md')).sort(),
-      design: has('design.md'),
-      tasks: has('tasks.md'),
-    })
+  const status = fromCli ?? (await statusWithoutCli($, ctx, dir, paths))
   const taskFile = status.docs.find(doc => doc.id === status.taskDoc)?.files[0]
   const [firstText, taskText] = await Promise.all([readText($, status.docs[0]?.files[0]), readText($, taskFile)])
   const change: BoardChange = {
@@ -140,13 +162,22 @@ async function scan($: EngineInterface): Promise<Pick<Board, 'found' | 'changes'
   if (await $.fs.exists(`${root}/openspec/config.yaml`)) {
     schemaStamps.push({ path: 'config.yaml', mtimeMs: (await $.fs.stat(`${root}/openspec/config.yaml`)).mtimeMs })
   }
-  const schemaSignature = signatureOf(schemaStamps)
+  const ctx: ScanContext = {
+    root,
+    schemaSignature: signatureOf(schemaStamps),
+    configYaml: await readText($, `${root}/openspec/config.yaml`),
+    layouts: new Map(),
+  }
   const listIn = async (dir: string, isArchived: boolean) => {
     if (!(await $.fs.exists(dir))) return []
     const names = (await $.fs.list(dir)).filter(entry => entry.kind === 'dir' && entry.name !== 'archive').map(entry => entry.name)
-    return inPool(names, CLI_RUNS_AT_ONCE, name => readChange($, root, schemaSignature, dir, name, isArchived))
+    return inPool(names, CLI_RUNS_AT_ONCE, name => readChange($, ctx, dir, name, isArchived))
   }
   const active = await listIn(changesDir, false)
+  // Active Changes first: their CLI answers give archived Changes on the same schema their layout.
+  for (const change of active) {
+    if (change.source === 'cli' && !ctx.layouts.has(change.schema)) ctx.layouts.set(change.schema, layoutOf(change))
+  }
   const archived = await listIn(`${changesDir}/archive`, true)
   active.sort((a, b) => a.id.localeCompare(b.id))
   // Archive folders start with their date, so newest first.

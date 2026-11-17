@@ -103,7 +103,7 @@ The board reads `openspec/changes/` and its archive. It is read-only: files stay
 
 The board follows the schema of each Change, as OpenSpec resolves it: from the Change's `.openspec.yaml`, from `openspec/config.yaml`, or the default `spec-driven`. It asks the `openspec` CLI with `openspec status --change <name> --json`, so a schema in `openspec/schemas/` brings its own documents to the board. The tasks come from the document that the schema's apply step requires.
 
-- Without the `openspec` CLI on the path, the board reads every Change as `spec-driven` and says so.
-- The CLI does not read archived Changes, so the board reads them as `spec-driven` too.
+- The CLI does not read archived Changes. The board reads an archived Change's schema name from its `.openspec.yaml` or `config.yaml`, and matches its files to that schema's documents, as the CLI gave them for an active Change.
+- Without the `openspec` CLI on the path, the board says so. It reads `spec-driven` Changes from their files, `skip_specs` included. For another schema, each Markdown file in the Change becomes a document, and the one with checkboxes holds the tasks.
 
 The board is a mod, which uses the early-access Claude Code plugin API. It draws with the elements every surface has, so it works in the terminal and in the desktop app.

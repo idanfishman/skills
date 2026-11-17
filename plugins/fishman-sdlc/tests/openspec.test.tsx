@@ -2,7 +2,22 @@ import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import type { Board, BoardView } from '../types'
-import { columnOf, countOf, parseStatus, parseTasks, specDrivenStatus, summaryOf, titleOf, visibleChanges } from '../hooks/openspec'
+import {
+  columnOf,
+  countOf,
+  layoutFromFiles,
+  layoutOf,
+  matchesPattern,
+  parseStatus,
+  parseTasks,
+  schemaNameOf,
+  skipsSpecsOf,
+  SPEC_DRIVEN_LAYOUT,
+  statusFromFiles,
+  summaryOf,
+  titleOf,
+  visibleChanges,
+} from '../hooks/openspec'
 import type { Change, Task } from '../hooks/openspec'
 
 const TASKS = `# Tasks
@@ -18,12 +33,7 @@ const TASKS = `# Tasks
 `
 
 const DIR = '/r/openspec/changes/c'
-const ALL_DOCS = specDrivenStatus({
-  proposal: [`${DIR}/proposal.md`],
-  specs: [`${DIR}/specs/auth/spec.md`],
-  design: [`${DIR}/design.md`],
-  tasks: [`${DIR}/tasks.md`],
-})
+const ALL_DOCS = statusFromFiles(SPEC_DRIVEN_LAYOUT, DIR, [`${DIR}/proposal.md`, `${DIR}/specs/auth/spec.md`, `${DIR}/design.md`, `${DIR}/tasks.md`])
 
 const done = (n: number, total: number): Task[] =>
   Array.from({ length: total }, (_, i) => ({ num: `1.${i + 1}`, text: `task ${i + 1}`, isDone: i < n, section: '1. Work' }))
@@ -41,8 +51,7 @@ const change = (patch: Partial<Change>): Change => ({
   ...patch,
 })
 
-const noDesignNoTasks = () =>
-  specDrivenStatus({ proposal: [`${DIR}/proposal.md`], specs: [`${DIR}/specs/auth/spec.md`], design: [], tasks: [] })
+const noDesignNoTasks = () => statusFromFiles(SPEC_DRIVEN_LAYOUT, DIR, [`${DIR}/proposal.md`, `${DIR}/specs/auth/spec.md`])
 
 // `openspec status --change fix-typo --json` for a Change on a custom "rapid" schema, trimmed.
 const RAPID_STATUS = JSON.stringify({
@@ -74,6 +83,43 @@ test('a custom schema from the CLI sets the documents and the task document', ()
   expect(status?.docs.map(d => d.id)).toEqual(['brief', 'checklist'])
   expect(status?.taskDoc).toBe('checklist')
   expect(status?.docs[1]?.files).toEqual(['/r/openspec/changes/fix-typo/checklist.md'])
+})
+
+test('an archived Change reuses the layout the CLI gave for its schema', () => {
+  const status = parseStatus(RAPID_STATUS)
+  if (!status) throw new Error('no status')
+  const archived = '/r/openspec/changes/archive/2026-10-20-old'
+  const read = statusFromFiles(layoutOf(status), archived, [`${archived}/brief.md`, `${archived}/checklist.md`, `${archived}/notes.txt`])
+  expect(read.docs.map(d => `${d.id}:${d.status}`)).toEqual(['brief:done', 'checklist:done'])
+  expect(read.taskDoc).toBe('checklist')
+})
+
+test('skip_specs read from the files matches what the CLI says', () => {
+  const files = [`${DIR}/proposal.md`, `${DIR}/design.md`, `${DIR}/tasks.md`]
+  const yaml = 'schema: spec-driven\nskip_specs: true\n'
+  const read = statusFromFiles(SPEC_DRIVEN_LAYOUT, DIR, files, skipsSpecsOf(yaml))
+  expect(read.docs.find(d => d.id === 'specs')?.status).toBe('skipped')
+  expect(read.isPlanningComplete).toBe(true)
+  expect(statusFromFiles(SPEC_DRIVEN_LAYOUT, DIR, files, skipsSpecsOf('schema: spec-driven\n')).isPlanningComplete).toBe(false)
+})
+
+test('a schema with no known layout lists the Change top-level Markdown files', () => {
+  const dir = '/r/openspec/changes/archive/x'
+  const layout = layoutFromFiles('lean', dir, [`${dir}/plan.md`, `${dir}/brief.md`, `${dir}/specs/a/spec.md`, `${dir}/.openspec.yaml`])
+  expect(layout.docs.map(d => d.id)).toEqual(['brief', 'plan', 'specs'])
+})
+
+test('the schema name comes from .openspec.yaml, then config.yaml, then the default', () => {
+  expect(schemaNameOf('schema: rapid\n', 'schema: lean\n')).toBe('rapid')
+  expect(schemaNameOf(null, 'context: x\nschema: "lean"\n')).toBe('lean')
+  expect(schemaNameOf(null, null)).toBe('spec-driven')
+})
+
+test('a glob pattern matches files under its folder with its extension', () => {
+  expect(matchesPattern('specs/**/*.md', 'specs/auth/spec.md')).toBe(true)
+  expect(matchesPattern('specs/**/*.md', 'specs/auth/notes.txt')).toBe(false)
+  expect(matchesPattern('brief.md', 'brief.md')).toBe(true)
+  expect(matchesPattern('brief.md', 'sub/brief.md')).toBe(false)
 })
 
 test('CLI output of another shape is refused, so the board falls back to the files', () => {

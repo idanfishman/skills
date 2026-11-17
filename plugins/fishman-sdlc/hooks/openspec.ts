@@ -86,7 +86,7 @@ export function parseTasks(text: string): Task[] {
   return tasks
 }
 
-type Status = Pick<Change, 'schema' | 'docs' | 'isPlanningComplete' | 'taskDoc'>
+export type Status = Pick<Change, 'schema' | 'docs' | 'isPlanningComplete' | 'taskDoc'>
 
 const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every(v => typeof v === 'string')
 
@@ -124,13 +124,62 @@ export function parseStatus(stdout: string): Status | null {
   }
 }
 
-/** The spec-driven documents from the files found on disk. */
-export function specDrivenStatus(found: Record<string, string[]>): Status {
-  const docs = SPEC_DRIVEN.map(doc => {
-    const files = found[doc.id] ?? []
-    return { id: doc.id, pattern: doc.pattern, status: files.length ? 'done' : 'missing', files }
+/** A schema's documents and its task document, without any one Change's files. */
+export type Layout = { schema: string; docs: { id: string; pattern: string }[]; taskDoc: string | null }
+
+export const SPEC_DRIVEN_LAYOUT: Layout = { schema: 'spec-driven', docs: [...SPEC_DRIVEN], taskDoc: 'tasks' }
+
+export function layoutOf(status: Status): Layout {
+  return { schema: status.schema, docs: status.docs.map(doc => ({ id: doc.id, pattern: doc.pattern })), taskDoc: status.taskDoc }
+}
+
+/** `brief.md` matches itself; `specs/**\/*.md` matches any `.md` file under `specs/`. */
+export function matchesPattern(pattern: string, relativePath: string): boolean {
+  const glob = pattern.indexOf('*')
+  if (glob === -1) return relativePath === pattern
+  const extension = pattern.slice(pattern.lastIndexOf('*') + 1)
+  return relativePath.startsWith(pattern.slice(0, glob)) && relativePath.endsWith(extension)
+}
+
+/**
+ * A Change's documents from its files, for a Change the CLI does not read.
+ * With `skipsSpecs` (`skip_specs: true` in its .openspec.yaml), a missing document under specs/ is skipped, as the CLI says.
+ */
+export function statusFromFiles(layout: Layout, dir: string, files: string[], skipsSpecs = false): Status {
+  const docs = layout.docs.map(doc => {
+    const found = files.filter(file => file.startsWith(`${dir}/`) && matchesPattern(doc.pattern, file.slice(dir.length + 1))).sort()
+    let status = found.length ? 'done' : 'missing'
+    if (!found.length && skipsSpecs && doc.pattern.startsWith('specs/')) status = 'skipped'
+    return { id: doc.id, pattern: doc.pattern, status, files: found }
   })
-  return { schema: 'spec-driven', docs, isPlanningComplete: docs.every(doc => doc.files.length > 0), taskDoc: 'tasks' }
+  const isPlanningComplete = docs.every(doc => doc.files.length > 0 || doc.status === 'skipped')
+  return { schema: layout.schema, docs, isPlanningComplete, taskDoc: layout.taskDoc }
+}
+
+export function skipsSpecsOf(changeYaml: string | null): boolean {
+  return changeYaml !== null && /^skip_specs:\s*true\s*$/m.test(changeYaml)
+}
+
+/** A schema the board knows no layout for: each Markdown file at the top of the Change is a document. */
+export function layoutFromFiles(schema: string, dir: string, files: string[]): Layout {
+  const docs = files
+    .filter(file => file.startsWith(`${dir}/`) && !file.slice(dir.length + 1).includes('/') && file.endsWith('.md'))
+    .sort()
+    .map(file => {
+      const name = file.slice(dir.length + 1)
+      return { id: name.slice(0, -'.md'.length), pattern: name }
+    })
+  if (files.some(file => file.startsWith(`${dir}/specs/`) && file.endsWith('.md'))) docs.push({ id: 'specs', pattern: 'specs/**/*.md' })
+  return { schema, docs, taskDoc: null }
+}
+
+/** The `schema:` line of a Change's .openspec.yaml, else of openspec/config.yaml, else the default. */
+export function schemaNameOf(...yamls: (string | null)[]): string {
+  for (const yaml of yamls) {
+    const name = yaml ? /^schema:\s*["']?([\w.-]+)/m.exec(yaml)?.[1] : undefined
+    if (name) return name
+  }
+  return 'spec-driven'
 }
 
 const GENERIC_TITLES = new Set(['proposal', 'change proposal', 'why', 'brief'])
