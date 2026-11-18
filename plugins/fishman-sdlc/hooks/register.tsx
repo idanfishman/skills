@@ -246,9 +246,9 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'openspec' }, async $ => {
-    await $.ui.open({ id: PANE, title: 'OpenSpec' })
+    const opened = await $.ui.open({ id: PANE, title: 'OpenSpec' })
     void refresh($)
-    return { text: 'OpenSpec board opened.' }
+    return { text: opened.isPlaced ? 'OpenSpec board opened.' : `OpenSpec board is open, but not shown: ${opened.reason}` }
   })
 
   // Claude's own edits refresh at once; editor saves arrive with the poll.

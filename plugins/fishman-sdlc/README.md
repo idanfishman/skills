@@ -88,7 +88,7 @@ The hook stops a mistake, not an adversary. It reads the command line, so a deli
 
 ## The OpenSpec board
 
-![The OpenSpec board: the Changes view, and a spec of the Google sign-in Change](../../.github/assets/openspec-board.webp)
+![The OpenSpec board: the Changes view, the proposal of the Google sign-in Change, and a Change that skips specs](../../.github/assets/openspec-board.webp)
 
 The board reads `openspec/changes/` and its archive. It is read-only: files stay the source of truth.
 
