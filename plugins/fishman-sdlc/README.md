@@ -47,6 +47,7 @@ When to use each part:
 | `reviewer` | Agent: Opus, high effort | Reviews the diff against the repository's `REVIEW.md` and the change's intent, from a fresh context. It reports and never edits. |
 | `verifier` | Agent: Sonnet, medium effort | Runs the gate and exercises each scenario of the change, as its actor. It reports and never fixes. |
 | Merge gate | `PreToolUse` hook | Stops Claude from merging a PR that has the `critical` label, or whose checks have not all passed. |
+| OpenSpec board | Mod: a pane beside the chat | Shows the repository's OpenSpec Changes, their tasks and their planning documents. It opens by itself in a repository with an `openspec/` folder. `/openspec` opens it again. |
 
 The short `/push` also works when no other command has that name. Claude Code has a built-in `/review`, so use `/fishman-sdlc:review`.
 
@@ -84,3 +85,25 @@ The hook stops Claude from merging a PR in two cases:
 It checks `gh pr merge`, the merge and auto-merge routes of `gh api`, and the GitHub MCP merge tools. Auto-merge gets the same rule, because without required checks GitHub can merge at once. If the hook can't read the PR's labels or checks, it blocks. It needs `jq`.
 
 The hook stops a mistake, not an adversary. It reads the command line, so a deliberate bypass can route around it, such as a script or `bash -c`. Where your GitHub plan allows it, add branch protection as the hard boundary.
+
+## The OpenSpec board
+
+![The OpenSpec board: the Changes view, the proposal of the Google sign-in Change, and a Change that skips specs](../../.github/assets/openspec-board.webp)
+
+The board reads `openspec/changes/` and its archive. It is read-only: files stay the source of truth.
+
+- **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning until its schema's planning documents all exist and its task document has tasks.
+- Each Change shows its checked tasks, such as `4 / 5`, and a bar. A Change with no task document shows "Tasks not defined", not 0%. An archived Change keeps its count, and its open tasks show as unfinished. Checked tasks and archiving do not mean that tests passed or that code shipped.
+- Search the Changes by title or folder name. Filter them to the ones not archived, the ones with open tasks or the archived ones. Sort them by name, by the most recent edit, by the most tasks done or by the most open tasks.
+- **Tasks** lists every task in two groups, Open and Completed. You can filter by Change and hide archived Changes.
+- Pick a Change to read its documents. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
+- The board refreshes at once when Claude edits a file in `openspec/`, and every 5 seconds for edits from other tools. "Claude edited" marks a Change whose files Claude edited in this session.
+
+### Custom schemas
+
+The board follows the schema of each Change, as OpenSpec resolves it: from the Change's `.openspec.yaml`, from `openspec/config.yaml`, or the default `spec-driven`. It asks the `openspec` CLI with `openspec status --change <name> --json`, so a schema in `openspec/schemas/` brings its own documents to the board. The tasks come from the document that the schema's apply step requires.
+
+- The CLI does not read archived Changes. The board reads an archived Change's schema name from its `.openspec.yaml` or `config.yaml`, and matches its files to that schema's documents, as the CLI gave them for an active Change.
+- Without the `openspec` CLI on the path, the board says so. It reads `spec-driven` Changes from their files, `skip_specs` included. For another schema, each Markdown file in the Change becomes a document, and the one with checkboxes holds the tasks.
+
+The board is a mod, which uses the early-access Claude Code plugin API. It draws with the elements every surface has, so it works in the terminal and in the desktop app.
