@@ -270,3 +270,23 @@ export function countOf(change: Change): string {
   const { done, total, hasTasks } = progressOf(change)
   return hasTasks ? `${done} / ${total}` : 'Tasks not defined'
 }
+
+const BOX_LINE = /^(\s*[-*]\s+)\[([ xX])\](\s+)/
+
+/** A task document's Markdown with each `[ ]` / `[x]` drawn as ☐ / ☑, since not every surface draws GFM checkboxes. */
+export function taskMarkdown(text: string): string {
+  return text
+    .split('\n')
+    .map(line => line.replace(BOX_LINE, (_, bullet: string, mark: string, space: string) => `${bullet}${mark === ' ' ? '☐' : '☑'}${space}`))
+    .join('\n')
+}
+
+/** One Change's tasks as a Markdown list for the Tasks tab; the number in bold, code spans kept. */
+export function taskListMarkdown(tasks: Task[]): string {
+  return tasks.map(t => `- ${t.isDone ? '☑' : '☐'} ${t.num ? `**${t.num}** ` : ''}${t.text}`).join('\n')
+}
+
+/** A person's close of the pane goes back to the list while a Change is open; a close from the list closes it. */
+export function closeGoesBack(origin: 'plugin' | 'person' | 'unload', sel: string | null): boolean {
+  return origin === 'person' && sel !== null
+}

@@ -15,6 +15,9 @@ import {
   SPEC_DRIVEN_LAYOUT,
   statusFromFiles,
   summaryOf,
+  closeGoesBack,
+  taskListMarkdown,
+  taskMarkdown,
   titleOf,
   visibleChanges,
 } from '../hooks/openspec'
@@ -207,13 +210,13 @@ const PANE = {
 } as const
 
 const BOARD: Board = { found: 'ok', touched: [], changes: SAMPLE }
-const VIEW: BoardView = { tab: 'changes', sel: null, doc: null, file: 0, filter: 'all', showArchived: true, hint: '', search: '', show: 'all', sort: 'name' }
+const VIEW: BoardView = { tab: 'changes', sel: null, doc: null, file: 0, filter: 'all', showArchived: true, showDone: false, hint: '', search: '', show: 'all', sort: 'name' }
 
 const seed = (on: Parameters<TestBody>[1], boardValue: Board, viewValue: BoardView) => {
   on('state.get', (_, e, next) => {
     const key = (e as { key?: string }).key
     if (key === 'board') return { value: { value: { shape: 'board-2', value: boardValue }, version: 1 } }
-    if (key === 'view') return { value: { value: { shape: 'view-2', value: viewValue }, version: 1 } }
+    if (key === 'view') return { value: { value: { shape: 'view-3', value: viewValue }, version: 1 } }
     return next(e)
   })
 }
@@ -254,7 +257,48 @@ test('the detail view shows a custom schema documents, on every surface', async 
     expect(await ui.find({ key: 'doc-design' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /^Schema: rapid$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /1 of 2 tasks checked/ })).toBeDefined()
-    expect(await ui.find({ key: 'act-0' })).toBeDefined()
+    // Started: Revise plan is the only agent action.
+    expect(await ui.find({ key: 'act-0', text: 'Revise plan' })).toBeDefined()
+    expect(await ui.find({ key: 'act-1' })).toBeUndefined()
+    expect(await ui.find({ key: 'copy-doc' })).toBeDefined()
+    expect((await ui.find({ key: 'open-file' })) === undefined).toBe(surface === 'mobile')
     await ui.unmount()
   }
+})
+
+test('task checkboxes draw as ☐ and ☑, code spans kept', () => {
+  expect(taskMarkdown('## 1. Work\n- [x] 1.1 Write `phone.ts`\n  - [ ] nested\n- [X] done\nNot [ ] a task')).toBe(
+    '## 1. Work\n- ☑ 1.1 Write `phone.ts`\n  - ☐ nested\n- ☑ done\nNot [ ] a task',
+  )
+  expect(taskListMarkdown(parseTasks(TASKS).slice(1))).toBe('- ☑ **1.2** Add the callback route\n- ☐ **2.1** Add the button')
+})
+
+test('the X goes back from a Change and closes from the list', () => {
+  expect(closeGoesBack('person', 'c')).toBe(true)
+  expect(closeGoesBack('person', null)).toBe(false)
+  expect(closeGoesBack('plugin', 'c')).toBe(false)
+  expect(closeGoesBack('unload', 'c')).toBe(false)
+})
+
+test('a ready Change offers Start implementing and Revise plan; the back button leads', async ($, on) => {
+  const ready = change({ key: 'd', id: 'add-dark-mode', title: 'Dark mode', tasks: done(0, 3) })
+  seed(on, { ...BOARD, changes: [ready] }, { ...VIEW, sel: 'd', doc: 'tasks' })
+  on('fs.read', () => ({ value: '## 1. Work\n- [ ] 1.1 Add `dark.css`\n' }))
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'back' })).toBeDefined()
+  expect(await ui.find({ key: 'tab-changes' })).toBeUndefined()
+  expect(await ui.find({ key: 'act-0', text: 'Start implementing' })).toBeDefined()
+  expect(await ui.find({ key: 'act-1', text: 'Revise plan' })).toBeDefined()
+  expect(await ui.find({ type: 'Markdown', text: /☐ 1\.1 Add `dark\.css`/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the Tasks tab groups open tasks per Change and hides checked ones', async ($, on) => {
+  seed(on, BOARD, { ...VIEW, tab: 'tasks' })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ key: 'tasks-open-g' })).toBeDefined()
+  expect(await ui.find({ key: 'tasklist-open-g' })).toBeDefined()
+  expect(await ui.find({ key: 'tasklist-done-g' })).toBeUndefined()
+  expect(await ui.find({ type: 'Markdown', text: /☐ \*\*1\.5\*\* task 5/ })).toBeDefined()
+  await ui.unmount()
 })

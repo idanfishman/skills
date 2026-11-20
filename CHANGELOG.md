@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-20
+
+### Added
+
+- The OpenSpec board has a **Copy** button beside the file path. It copies the document you read. The pane does not let you select text.
+
+### Changed
+
+- The OpenSpec board shows a task document as Markdown, like the other documents. Checkboxes show as ☐ and ☑, and code in backticks shows as code.
+- The Tasks view groups the open tasks by Change. Click a Change's title to open it. Checked tasks stay hidden until you show them.
+- **← Back** takes you back to where you came from. While a Change is open, the pane's close button also goes back. On the list, it closes the pane.
+
+### Removed
+
+- The board's "Apply next task" button.
+
+### Fixed
+
+- **Open file** opens the document in your default app. Before, it did nothing in the desktop app.
+
 ## [1.4.0] - 2026-11-17
 
 ### Added
@@ -69,7 +89,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The `no-fluff` skill writes or rewrites text to a clear-writing standard based on ASD-STE100 Simplified Technical English. Run it as `/fishman:no-fluff [text or file]`. Give it a file path to rewrite that file, or a description to write new text. Claude also loads it when you ask for plain, simple or clear language.
 - The `come-again` skill tells Claude to explain its last answer again in `no-fluff` style. Claude first gives 2–3 sentences of context, then the answer. Run it as `/fishman:come-again [part]` to explain only one part. Claude loads it only when you run the command.
 
-[unreleased]: https://github.com/idanfishman/skills/compare/v1.4.0...HEAD
+[unreleased]: https://github.com/idanfishman/skills/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/idanfishman/skills/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/idanfishman/skills/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/idanfishman/skills/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/idanfishman/skills/compare/v1.3.0...v1.3.1
