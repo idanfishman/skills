@@ -95,8 +95,9 @@ The board reads `openspec/changes/` and its archive. It is read-only: files stay
 - **Changes** puts each Change in one column: Planning, Ready to implement, Implementation started, Tasks complete or Archived. The board sets the column from the files. OpenSpec itself has no such status. A Change is in Planning until its schema's planning documents all exist and its task document has tasks.
 - Each Change shows its checked tasks, such as `4 / 5`, and a bar. A Change with no task document shows "Tasks not defined", not 0%. An archived Change keeps its count, and its open tasks show as unfinished. Checked tasks and archiving do not mean that tests passed or that code shipped.
 - Search the Changes by title or folder name. Filter them to the ones not archived, the ones with open tasks or the archived ones. Sort them by name, by the most recent edit, by the most tasks done or by the most open tasks.
-- **Tasks** lists every task in two groups, Open and Completed. You can filter by Change and hide archived Changes.
-- Pick a Change to read its documents. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
+- **Tasks** lists the open tasks of each Change. You can show the checked tasks too, filter by Change and hide archived Changes.
+- Pick a Change to read its documents. **Copy** copies the document, and **Open file** opens it in your default app. The buttons below a document put an `/opsx:*` command in the prompt box. Nothing runs until you send it.
+- **← Back**, or the pane's close button, goes back to where you came from. On the list, the close button closes the pane.
 - The board refreshes at once when Claude edits a file in `openspec/`, and every 5 seconds for edits from other tools. "Claude edited" marks a Change whose files Claude edited in this session.
 
 ### Custom schemas

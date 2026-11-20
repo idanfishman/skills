@@ -32,6 +32,8 @@ export type BoardView = {
   file: number
   filter: string
   showArchived: boolean
+  // The Tasks tab lists checked tasks too.
+  showDone: boolean
   hint: string
   // The Changes view's search, filter and sort.
   search: string

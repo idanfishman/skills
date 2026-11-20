@@ -20,6 +20,9 @@ import {
   SPEC_DRIVEN_LAYOUT,
   statusFromFiles,
   summaryOf,
+  closeGoesBack,
+  taskListMarkdown,
+  taskMarkdown,
   titleOf,
   visibleChanges,
 } from './openspec'
@@ -38,13 +41,14 @@ const START_VIEW: BoardView = {
   file: 0,
   filter: 'all',
   showArchived: true,
+  showDone: false,
   hint: '',
   search: '',
   show: 'all',
   sort: 'name',
 }
 const board = atom({ plugin: 'fishman-sdlc', key: 'board' } as const, EMPTY_BOARD, { shape: 'board-2' })
-const view = atom({ plugin: 'fishman-sdlc', key: 'view' } as const, START_VIEW, { shape: 'view-2' })
+const view = atom({ plugin: 'fishman-sdlc', key: 'view' } as const, START_VIEW, { shape: 'view-3' })
 
 // A Change is read again, and the CLI asked again, only when a file of it or of the schemas changed.
 const cache = new Map<string, { signature: string; change: BoardChange }>()
@@ -270,6 +274,16 @@ export const register: Register = on => {
     return result
   }).catch(($, e, next) => next(e))
 
+  // The pane's X goes back from a Change, as people reach for it there; from the list it closes.
+  on('ui.close', async ($, e, next) => {
+    if (e.id !== PANE) return next(e)
+    const v = await read($, view)
+    if (!closeGoesBack(e.origin.kind, v.sel)) return next(e)
+    await update($, view, current => ({ ...current, sel: null, hint: '' }))
+    // Answered without next: the pane stays open.
+    return { value: undefined }
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Input, Select, Markdown, Progress, Link } = $.ui.resolve(e)
     const b = await read($, board)
@@ -280,6 +294,20 @@ export const register: Register = on => {
     const ask = (command: string) => () => {
       void $.prompt.fill({ text: `${command} `, mode: 'insert' })
       void update($, view, current => ({ ...current, hint: `“${command}” is in the composer. Press Enter to send it.` }))
+    }
+    const openFile = async (path: string) => {
+      // `open` on macOS, `xdg-open` elsewhere; the host's default app for the file.
+      for (const opener of ['open', 'xdg-open']) {
+        try {
+          const { exitCode, stderr } = await $.process.run([opener, path], { timeoutMs: 10000 })
+          if (exitCode === 0) return
+          await update($, view, current => ({ ...current, hint: `Could not open ${path}: ${stderr.trim() || `exit ${exitCode}`}` }))
+          return
+        } catch {
+          // This opener is not on the host; try the next.
+        }
+      }
+      await update($, view, current => ({ ...current, hint: `Could not open ${path}: no open or xdg-open on this machine.` }))
     }
     const hint = v.hint ? <Text>{v.hint}</Text> : <Text dimColor>Buttons put a command in the composer. Nothing runs until you send it.</Text>
 
@@ -338,21 +366,16 @@ export const register: Register = on => {
       const fileIndex = doc ? Math.min(v.file, Math.max(0, doc.files.length - 1)) : 0
       const filePath = doc?.files[fileIndex] ?? (doc ? `${cur.dir}/${docName(doc)}` : cur.dir)
       const relative = (path: string) => (path.startsWith(`${cur.dir}/`) ? path.slice(cur.dir.length + 1) : path)
-      const text = doc && doc.files.length > 0 && !isTaskDoc ? await readText($, filePath) : null
+      const raw = doc && doc.files.length > 0 ? await readText($, filePath) : null
+      const text = raw !== null && isTaskDoc ? taskMarkdown(raw) : raw
       const commands: Record<string, [string, string][]> = {
         planning: [['Continue planning', `/opsx:continue ${cur.id}`]],
         ready: [['Start implementing', `/opsx:apply ${cur.id}`], ['Revise plan', `/opsx:update ${cur.id}`]],
-        started: [['Apply next task', `/opsx:apply ${cur.id}`], ['Revise plan', `/opsx:update ${cur.id}`]],
+        started: [['Revise plan', `/opsx:update ${cur.id}`]],
         complete: [['Sync specs', `/opsx:sync ${cur.id}`], ['Archive', `/opsx:archive ${cur.id}`]],
         archived: s.isWarning ? [['Propose a follow-up', `/opsx:propose follow-up for ${cur.id}`]] : [],
       }
       const actions = commands[columnOf(cur)] ?? []
-      const sections: { name: string; tasks: { num: string; text: string; isDone: boolean }[] }[] = []
-      for (const task of cur.tasks ?? []) {
-        const last = sections[sections.length - 1]
-        if (last && last.name === task.section) last.tasks.push(task)
-        else sections.push({ name: task.section, tasks: [task] })
-      }
       let missingText = ''
       if (doc && doc.files.length === 0) {
         if (doc.status === 'skipped') missingText = `This Change skips ${docName(doc)}.`
@@ -362,9 +385,8 @@ export const register: Register = on => {
 
       return (
         <Box flexDirection="column" gap="sm">
-          {tabs}
           <Box flexDirection="row" gap="sm">
-            <Button key="back" label={`← ${v.tab === 'tasks' ? 'Tasks' : 'Changes'}`} onPress={setView({ sel: null, hint: '' })} />
+            <Button key="back" variant="primary" label="← Back" onPress={setView({ sel: null, hint: '' })} />
             {prev ? <Button key="prev" label="Previous" onPress={setView({ sel: prev.key, doc: null, file: 0, hint: '' })} /> : null}
             {nextChange ? <Button key="next" label="Next" onPress={setView({ sel: nextChange.key, doc: null, file: 0, hint: '' })} /> : null}
           </Box>
@@ -404,61 +426,51 @@ export const register: Register = on => {
               }}
             />
           ) : null}
-          <Text mono dimColor>{`${relative(filePath)} · read-only`}</Text>
+          <Box flexDirection="row" gap="sm" flexWrap="wrap">
+            <Text mono dimColor>{relative(filePath)}</Text>
+            {raw !== null ? <Button key="copy-doc" plain label="Copy" onPress={press => void $.ui.copy({ text: raw, surface: press.surface })} /> : null}
+            {raw !== null && e.surface !== 'mobile' ? <Button key="open-file" plain label="Open file" onPress={() => void openFile(filePath)} /> : null}
+          </Box>
+          {v.hint && !actions.length ? <Text>{v.hint}</Text> : null}
           {missingText ? (
             <Box borderStyle="dashed" borderDimColor paddingX={1}>
               <Text dimColor>{missingText}</Text>
             </Box>
           ) : null}
           {text !== null ? <Markdown key="doc" text={text || '(empty file)'} /> : null}
-          {isTaskDoc && cur.tasks ? (
-            <Box flexDirection="column" gap="xs">
-              {cur.tasks.length === 0 ? <Text dimColor>{`${relative(filePath)} has no checkboxes yet.`}</Text> : null}
-              {sections.map(section => (
-                <Box flexDirection="column">
-                  {section.name ? <Text bold>{section.name}</Text> : null}
-                  {section.tasks.map(task =>
-                    task.isDone ? (
-                      <Text dimColor>{`☑ ${task.num} ${task.text}`}</Text>
-                    ) : (
-                      <Text color={cur.isArchived ? 'warning' : 'text'}>{`☐ ${task.num} ${task.text}`}</Text>
-                    ),
-                  )}
-                </Box>
-              ))}
+          {isTaskDoc && cur.tasks?.length === 0 ? <Text dimColor>{`${relative(filePath)} has no checkboxes yet.`}</Text> : null}
+          {actions.length ? (
+            <Box flexDirection="column" gap="xs" paddingTop={1}>
+              <Box flexDirection="row" gap="sm" flexWrap="wrap">
+                {actions.map(([label, command], i) => (
+                  <Button key={`act-${i}`} variant={i === 0 ? 'primary' : 'secondary'} label={label} onPress={ask(command)} />
+                ))}
+              </Box>
+              {hint}
             </Box>
           ) : null}
-          <Box flexDirection="column" gap="xs" paddingTop={1}>
-            <Box flexDirection="row" gap="sm" flexWrap="wrap">
-              {actions.map(([label, command], i) => (
-                <Button key={`act-${i}`} variant={i === 0 ? 'primary' : 'secondary'} label={label} onPress={ask(command)} />
-              ))}
-              <Link href={`file://${filePath}`} label="Open file" />
-            </Box>
-            {actions.length ? hint : <Text dimColor>No agent action for an archived Change.</Text>}
-          </Box>
         </Box>
       )
     }
 
     if (v.tab === 'tasks') {
-      const rows = b.changes
-        .filter(c => (v.filter === 'all' || v.filter === c.key) && (v.showArchived || !c.isArchived))
-        .flatMap(c => (c.tasks ?? []).map((task, i) => ({ c, task, i })))
-      const undefinedTitles = b.changes.filter(c => c.tasks === null && (v.filter === 'all' || v.filter === c.key)).map(c => c.title)
+      const inFilter = b.changes.filter(c => (v.filter === 'all' || v.filter === c.key) && (v.showArchived || !c.isArchived))
+      const undefinedTitles = inFilter.filter(c => c.tasks === null).map(c => c.title)
       const group = (label: string, isDone: boolean) => {
-        const list = rows.filter(r => r.task.isDone === isDone)
+        const perChange = inFilter.map(c => ({ c, tasks: (c.tasks ?? []).filter(t => t.isDone === isDone) })).filter(g => g.tasks.length > 0)
+        const total = perChange.reduce((n, g) => n + g.tasks.length, 0)
         return (
-          <Box flexDirection="column" gap="xs">
-            <Text bold>{`${label} ${list.length}`}</Text>
-            {list.length === 0 ? <Text dimColor>None for this filter.</Text> : null}
-            {list.map(({ c, task, i }) => (
-              <Box flexDirection="column">
-                <Button key={`task-${c.key}-${i}`} plain onPress={setView({ sel: c.key, doc: c.taskDoc, file: 0, hint: '' })}>
-                  {`${isDone ? '☑' : '☐'} ${task.text} `}
-                  <Text dimColor>{`${c.title} · ${task.num}`}</Text>
+          <Box flexDirection="column" gap="sm">
+            <Text bold>{`${label} ${total}`}</Text>
+            {total === 0 ? <Text dimColor>None for this filter.</Text> : null}
+            {perChange.map(({ c, tasks }) => (
+              <Box flexDirection="column" gap="xs">
+                <Button key={`tasks-${isDone ? 'done' : 'open'}-${c.key}`} plain onPress={setView({ sel: c.key, doc: c.taskDoc, file: 0, hint: '' })}>
+                  {`${c.title} `}
+                  <Text dimColor>{`${tasks.length} · ${countOf(c)}`}</Text>
                 </Button>
                 {c.isArchived && !isDone ? <Text color="warning">Unfinished · its Change is archived</Text> : null}
+                <Markdown key={`tasklist-${isDone ? 'done' : 'open'}-${c.key}`} text={taskListMarkdown(tasks)} dimColor={isDone} />
               </Box>
             ))}
           </Box>
@@ -467,19 +479,22 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column" gap="sm">
           {tabs}
-          <Select
-            key="filter"
-            label="Change"
-            value={v.filter}
-            options={[{ value: 'all', label: 'All changes' }, ...b.changes.map(c => ({ value: c.key, label: c.isArchived ? `${c.title} (archived)` : c.title }))]}
-            onSelect={value => {
-              void update($, view, current => ({ ...current, filter: value }))
-            }}
-          />
-          <Button key="archived" label={v.showArchived ? 'Archived Changes: shown' : 'Archived Changes: hidden'} onPress={setView({ showArchived: !v.showArchived })} />
+          <Box flexDirection="row" gap="sm" flexWrap="wrap">
+            <Select
+              key="filter"
+              label="Change"
+              value={v.filter}
+              options={[{ value: 'all', label: 'All changes' }, ...b.changes.map(c => ({ value: c.key, label: c.isArchived ? `${c.title} (archived)` : c.title }))]}
+              onSelect={value => {
+                void update($, view, current => ({ ...current, filter: value }))
+              }}
+            />
+            <Button key="archived" label={v.showArchived ? 'Archived: shown' : 'Archived: hidden'} onPress={setView({ showArchived: !v.showArchived })} />
+            <Button key="done" label={v.showDone ? 'Checked: shown' : 'Checked: hidden'} onPress={setView({ showDone: !v.showDone })} />
+          </Box>
           {undefinedTitles.length ? <Text dimColor>{`Tasks not defined: ${undefinedTitles.join(', ')}`}</Text> : null}
           {group('Open', false)}
-          {group('Completed', true)}
+          {v.showDone ? group('Checked', true) : null}
         </Box>
       )
     }
